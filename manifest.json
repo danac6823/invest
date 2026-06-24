@@ -1,6 +1,6 @@
 {
-  "name": "豐盛投資追蹤",
-  "short_name": "投資追蹤",
+  "name": "豐盛之路",
+  "short_name": "豐盛之路",
   "description": "個人投資組合記錄與資產配置追蹤",
   "start_url": "./",
   "scope": "./",
