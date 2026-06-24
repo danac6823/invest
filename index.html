@@ -235,10 +235,11 @@ button.btn.ghost{background:transparent; color:var(--ink); border:1px solid var(
 /* tx list */
 .tx{display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--line); font-size:14.5px}
 .tx:last-child{border-bottom:0}
-.tx .tg{font-size:11px; padding:2px 7px; border-radius:20px; background:var(--paper); color:var(--muted); flex:none}
-.tx .tnm{font-weight:600}
-.tx .tsub{color:var(--muted); font-size:13px}
-.tx .tamt{margin-left:auto; text-align:right; font-weight:600; font-variant-numeric:tabular-nums}
+.tx .tg{font-size:11px; width:42px; box-sizing:border-box; padding:3px 4px; border-radius:7px; background:var(--paper); color:var(--muted); flex:none; text-align:center; white-space:normal; line-height:1.25; word-break:break-word}
+.tx .tnm{font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.tx .tsub{color:var(--muted); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.tx .tamt{margin-left:auto; text-align:right; font-weight:600; font-variant-numeric:tabular-nums; flex:none}
+.resbadge{display:inline-block; font-size:10px; font-weight:700; color:#6b4e00; background:rgba(196,150,58,.18); border:1px solid rgba(196,150,58,.45); padding:1px 6px; border-radius:6px; vertical-align:middle}
 .tx .del{flex:none; width:26px; height:26px; border-radius:50%; border:1px solid var(--line); background:#fff; color:var(--muted); font-size:15px; line-height:1; cursor:pointer}
 .tx .del:active{background:var(--paper)}
 .txfilter{border:1px solid var(--line); border-radius:8px; padding:5px 8px; font-size:13px; font-family:inherit; background:#FCFCFB; color:var(--ink); max-width:58%}
@@ -391,8 +392,9 @@ nav button.on .ic{transform:translateY(-1px)}
         </div>
         <div class="grid2">
           <div class="field"><label id="lbFee">手續費 (NT$)</label><input id="fFee" type="number" inputmode="decimal" placeholder="留空＝自動估算"></div>
-          <div class="field"><label>日期（可留空）</label><input id="fDate" type="date"></div>
+          <div class="field"><label id="lbDate">日期（可留空）</label><input id="fDate" type="date"></div>
         </div>
+        <div id="recDateField" class="field" style="display:none"><label>對帳日期（回填淨值／單位時，選填）</label><input id="fRecDate" type="date"></div>
         <div id="refField" class="field" style="display:none"><label>交易編號／備註（選填）</label><input id="fRef" placeholder="申購委託書號、平台或備註，待補可寫"></div>
         <div class="field"><label>交易類型</label><select id="fKind"><option value="spot">現買</option><option value="dca">定期</option><option value="sell">賣出</option></select></div>
         <div id="reserveField" style="display:none; margin-bottom:14px"><label style="display:flex; align-items:center; gap:9px; font-size:14px; color:var(--ink); cursor:pointer"><input type="checkbox" id="fReserve" style="width:20px; height:20px; flex:none"> 這筆動用預備金加碼（從子彈扣，不算月計畫）</label></div>
@@ -448,7 +450,7 @@ nav button.on .ic{transform:translateY(-1px)}
   <!-- 持倉 -->
   <section id="tab-hold">
     <div class="card">
-      <p class="eyebrow">持倉與損益 · 只參照（點標的看交易、編輯請到「記錄」）</p>
+      <p class="eyebrow">持倉與損益</p>
       <div id="holdList"></div>
     </div>
     <div class="card">
@@ -548,7 +550,6 @@ nav button.on .ic{transform:translateY(-1px)}
       <div class="tools">
         <button class="btn ghost" id="expBtn">匯出備份</button>
         <button class="btn ghost" id="impBtn">匯入</button>
-        <button class="btn ghost" id="resetBtn">重置</button>
       </div>
       <input id="impFile" type="file" accept="application/json" style="display:none">
       <p class="note">資料存在這支手機的瀏覽器裡。換手機或清快取前，記得先匯出備份。</p>
@@ -648,6 +649,7 @@ function unitWord(code){ return isFund(code)?'單位':'股'; }
 function shStr(code,sh){ return isFund(code)?fmt2(sh):fmt(sh); }
 function dispCatOf(code,cat){ return isFund(code)?'基金':catLabel(cat||meta(code).cat); }
 function kindLabelOf(t){ var f=isFund(t.code); if(t.kind==='sell') return f?'贖回':'賣出'; if(t.kind==='dca') return f?'定期申購':'定期'; return f?'申購':'現買'; }
+function mmdd(d){ if(!d) return ''; var m=String(d).match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[2]+'/'+m[3]):d; }
 function mergedCatalog(){ return Object.assign({}, CATALOG, FUNDS, (state&&state.catalog)||{}); }
 function selectableCatalog(){ var mc=mergedCatalog(); if(state&&state.fundOn) return mc; var o={}; Object.keys(mc).forEach(function(k){ if(!mc[k].fund) o[k]=mc[k]; }); return o; }
 function isFund(code){ var i=mergedCatalog()[code]; return !!(i&&i.fund); }
@@ -675,13 +677,7 @@ const SEED={
     {code:'006208', amount:10500, day:15, on:true, start:''},
     {code:'VOO', amount:9000, day:10, on:true, start:''}
   ],
-  tx:[
-    {code:'2330',sh:10,px:2270},{code:'2330',sh:30,px:2290},{code:'2330',sh:5,px:2415},
-    {code:'2330',sh:5,px:2410},
-    {code:'2454',sh:5,px:4325},
-    {code:'0050',sh:93,px:104.98},{code:'0050',sh:100,px:102.60},{code:'0050',sh:200,px:102},
-    {code:'006208',sh:100,px:237.2},{code:'006208',sh:100,px:236.95},{code:'006208',sh:19,px:235.80},
-  ],
+  tx:[],
 };
 let state; let expandedCode=null; let editingPlan=null; let editTx=null; let txFilterCode='__all__';
 function normalize(s){
@@ -896,7 +892,7 @@ function render(){
   else { moMsg.innerHTML='已超出計畫 <b>'+fmt(Math.round(moBudgetUse-moPlan))+'</b>'; moMsg.className='mowarn'; moFill.className='mobarfill over'; }
   var moResRem=reserveLeft();
   var moCashBal=Math.round(cashBalance());
-  document.getElementById('moCash').textContent=fmt(moCashBal);
+  var moCashEl=document.getElementById('moCash'); moCashEl.textContent=fmt(moCashBal); moCashEl.style.color=moCashBal<0?'#C8312B':'';
   document.getElementById('moResLeft').textContent=fmt(moResRem);
   document.getElementById('moAvail').textContent=fmt(moCashBal+moResRem);
 
@@ -962,23 +958,35 @@ function render(){
     var el=document.createElement('div');
     if(editTx===o.idx){
       var feeVal=(t.fee!==undefined&&t.fee!==null&&t.fee!=='')?t.fee:'';
+      var isF=isFund(t.code);
       el.className='txedit';
+      var midRows;
+      if(isF){
+        var amtVal=Math.round((Number(t.sh)||0)*(Number(t.px)||0));
+        midRows='<label class="txe-f"><span>申購金額</span><input class="edamt" inputmode="decimal" data-i="'+o.idx+'" value="'+amtVal+'"></label>'+
+          '<label class="txe-f"><span>淨值 NAV</span><input class="ednav" inputmode="decimal" data-i="'+o.idx+'" value="'+t.px+'"></label>'+
+          '<div class="txe-f txe-full" style="color:var(--muted)">換算單位：<span class="ednote" data-i="'+o.idx+'">'+fmt2(t.sh)+' 單位</span></div>';
+      } else {
+        midRows='<label class="txe-f"><span>股數／單位</span><input class="ed" inputmode="decimal" data-i="'+o.idx+'" data-f="sh" value="'+t.sh+'"></label>'+
+          '<label class="txe-f"><span>單價</span><input class="ed" inputmode="decimal" data-i="'+o.idx+'" data-f="px" value="'+t.px+'"></label>';
+      }
       el.innerHTML='<div class="txe-nm">'+(t.name||info.name||t.code)+' <small>'+t.code+'</small></div>'+
         '<div class="txe-grid">'+
-          '<label class="txe-f txe-full"><span>日期</span><input class="ed" type="date" data-i="'+o.idx+'" data-f="date" value="'+(t.date||'')+'"></label>'+
-          '<label class="txe-f"><span>股數／單位</span><input class="ed" inputmode="decimal" data-i="'+o.idx+'" data-f="sh" value="'+t.sh+'"></label>'+
-          '<label class="txe-f"><span>單價</span><input class="ed" inputmode="decimal" data-i="'+o.idx+'" data-f="px" value="'+t.px+'"></label>'+
+          '<label class="txe-f txe-full"><span>'+(isF?'交易日期（扣款日）':'日期')+'</span><input class="ed" type="date" data-i="'+o.idx+'" data-f="date" value="'+(t.date||'')+'"></label>'+
+          (isF?'<label class="txe-f txe-full"><span>對帳日期（回填淨值時）</span><input class="ed" type="date" data-i="'+o.idx+'" data-f="recDate" value="'+(t.recDate||'')+'"></label>':'')+
+          midRows+
           '<label class="txe-f"><span>手續費</span><input class="ed" inputmode="decimal" data-i="'+o.idx+'" data-f="fee" value="'+feeVal+'" placeholder="'+fmt(feeOf(amt))+'"></label>'+
-          '<label class="txe-f"><span>類型</span><select class="ed" data-i="'+o.idx+'" data-f="kind"><option value="spot"'+(!t.kind||t.kind==='spot'?' selected':'')+'>現買</option><option value="dca"'+(t.kind==='dca'?' selected':'')+'>定期</option><option value="sell"'+(t.kind==='sell'?' selected':'')+'>賣出</option></select></label>'+
+          '<label class="txe-f"><span>類型</span><select class="ed" data-i="'+o.idx+'" data-f="kind"><option value="spot"'+(!t.kind||t.kind==='spot'?' selected':'')+'>'+(isF?'申購':'現買')+'</option><option value="dca"'+(t.kind==='dca'?' selected':'')+'>'+(isF?'定期申購':'定期')+'</option><option value="sell"'+(t.kind==='sell'?' selected':'')+'>'+(isF?'贖回':'賣出')+'</option></select></label>'+
+          (isF?'<label class="txe-f txe-full"><span>交易編號／備註</span><input class="ed" data-i="'+o.idx+'" data-f="ref" value="'+(t.ref||'')+'" placeholder="選填"></label>':'')+
         '</div>'+
-        (t.kind!=='sell'?'<label class="txe-chk"><input type="checkbox" class="edres" data-i="'+o.idx+'"'+(t.reserve?' checked':'')+'> 這筆動用預備金加碼（從子彈扣，不算月計畫）</label>':'')+
+        (t.kind!=='sell'&&!isF?'<label class="txe-chk"><input type="checkbox" class="edres" data-i="'+o.idx+'"'+(t.reserve?' checked':'')+'> 這筆動用預備金加碼（從子彈扣，不算月計畫）</label>':'')+
         '<div class="txe-act"><button class="done" data-i="'+o.idx+'">完成</button><button class="del" data-i="'+o.idx+'">刪除這筆</button></div>';
     } else {
       el.className='tx'; el.setAttribute('data-edit', o.idx); el.style.cursor='pointer';
       var tcat=t.cat||info.cat;
       el.innerHTML='<span class="tg" style="background:'+(isFund(t.code)?FUND_COLOR:(CATCOLOR[tcat]||'#9AA0A6'))+';color:#fff">'+dispCatOf(t.code,tcat)+'</span>'+
-        '<div><div class="tnm">'+(t.name||info.name||t.code)+' <small style="color:var(--muted)">'+t.code+'</small> <span class="kbadge '+(t.kind==='sell'?'sell':(t.kind==='dca'?'dca':'spot'))+'">'+kindLabelOf(t)+'</span></div>'+
-        '<div class="tsub num">'+shStr(t.code,t.sh)+' '+unitWord(t.code)+' × '+fmt2(t.px)+(t.date?' · '+t.date:'')+(t.reserve?' · <span style="color:var(--gold)">預備金</span>':'')+(t.ref?' · <span style="color:var(--muted)">#'+t.ref+'</span>':'')+'</div></div>'+
+        '<div style="flex:1; min-width:0"><div class="tnm">'+(t.name||info.name||t.code)+' <small style="color:var(--muted)">'+t.code+'</small> <span class="kbadge '+(t.kind==='sell'?'sell':(t.kind==='dca'?'dca':'spot'))+'">'+kindLabelOf(t)+'</span>'+(t.reserve?' <span class="resbadge">預備金</span>':'')+'</div>'+
+        '<div class="tsub num">'+(t.date?mmdd(t.date)+' · ':'')+shStr(t.code,t.sh)+' '+unitWord(t.code)+' × '+fmt2(t.px)+(t.ref?' · #'+t.ref:'')+'</div></div>'+
         '<div class="tamt">'+fmt(t.kind==='sell'?amt:amt+fee)+'</div>'+
         '<button class="del" aria-label="刪除" data-i="'+o.idx+'">✕</button>';
     }
@@ -986,7 +994,10 @@ function render(){
   });
   tl.querySelectorAll('.del').forEach(function(b){ b.onclick=function(e){ e.stopPropagation(); if(confirm('刪除這筆記錄？')){ var i=+b.dataset.i; state.tx.splice(i,1); if(editTx===i) editTx=null; save(); render(); } }; });
   tl.querySelectorAll('.tx[data-edit]').forEach(function(row){ row.onclick=function(e){ if(e.target.closest('.del'))return; editTx=+row.dataset.edit; render(); }; });
-  tl.querySelectorAll('.ed').forEach(function(inp){ inp.onchange=function(){ var i=+inp.dataset.i, f=inp.dataset.f, v=inp.value; if(f==='date'){ state.tx[i].date=v; } else if(f==='kind'){ state.tx[i].kind=v; } else if(f==='fee'){ if(v===''){ delete state.tx[i].fee; } else { state.tx[i].fee=parseFloat(v)||0; } } else { var n=parseFloat(v); if(!isNaN(n)&&n>0) state.tx[i][f]=n; } save(); render(); }; });
+  tl.querySelectorAll('.ed').forEach(function(inp){ inp.onchange=function(){ var i=+inp.dataset.i, f=inp.dataset.f, v=inp.value; if(f==='date'){ state.tx[i].date=v; } else if(f==='recDate'){ if(v) state.tx[i].recDate=v; else delete state.tx[i].recDate; } else if(f==='ref'){ if(v.trim()) state.tx[i].ref=v.trim(); else delete state.tx[i].ref; } else if(f==='kind'){ state.tx[i].kind=v; } else if(f==='fee'){ if(v===''){ delete state.tx[i].fee; } else { state.tx[i].fee=parseFloat(v)||0; } } else { var n=parseFloat(v); if(!isNaN(n)&&n>0) state.tx[i][f]=n; } save(); render(); }; });
+  function edRecalc(i,saveIt){ var amtEl=tl.querySelector('.edamt[data-i="'+i+'"]'), navEl=tl.querySelector('.ednav[data-i="'+i+'"]'), noteEl=tl.querySelector('.ednote[data-i="'+i+'"]'); var amt=parseFloat(amtEl&&amtEl.value), nav=parseFloat(navEl&&navEl.value); if(amt>0&&nav>0){ var u=amt/nav; if(noteEl) noteEl.textContent=fmt2(u)+' 單位'; if(saveIt){ state.tx[i].sh=u; state.tx[i].px=nav; save(); render(); } } else if(noteEl){ noteEl.textContent='待金額與淨值'; } }
+  tl.querySelectorAll('.edamt').forEach(function(inp){ var i=+inp.dataset.i; inp.oninput=function(){ edRecalc(i,false); }; inp.onchange=function(){ edRecalc(i,true); }; });
+  tl.querySelectorAll('.ednav').forEach(function(inp){ var i=+inp.dataset.i; inp.oninput=function(){ edRecalc(i,false); }; inp.onchange=function(){ edRecalc(i,true); }; });
   tl.querySelectorAll('.done').forEach(function(b){ b.onclick=function(){ editTx=null; render(); }; });
   tl.querySelectorAll('.edres').forEach(function(c){ c.onchange=function(){ var i=+c.dataset.i; if(c.checked) state.tx[i].reserve=true; else delete state.tx[i].reserve; save(); render(); }; });
 
@@ -1053,7 +1064,7 @@ function render(){
   })();
   const resLeft=resRem;
   const cbal=cashBalance();
-  document.getElementById('cashBal').textContent=fmt(Math.round(cbal));
+  var cashBalEl=document.getElementById('cashBal'); cashBalEl.textContent=fmt(Math.round(cbal)); cashBalEl.style.color=cbal<0?'#C8312B':'';
   document.getElementById('cashRes').textContent=fmt(resLeft);
   document.getElementById('cashTotal').textContent=fmt(Math.round(cbal)+resLeft);
   renderCash();
@@ -1105,7 +1116,7 @@ document.getElementById('addBtn').onclick=()=>{
   if(!(code in CATALOG) && !(code in FUNDS)){ if(!state.catalog)state.catalog={}; state.catalog[code]={name:info.name,cat:info.cat}; } // 記住自訂標的，下次自動帶出
   const t={code,name:info.name,cat:info.cat,sh,px,date:date||'',kind:kind};
   if(isFundSel) t.fund=true;
-  if(isFundSel){ var refv=(document.getElementById('fRef').value||'').trim(); if(refv) t.ref=refv; }
+  if(isFundSel){ var refv=(document.getElementById('fRef').value||'').trim(); if(refv) t.ref=refv; var rcd=document.getElementById('fRecDate').value; if(rcd) t.recDate=rcd; }
   if(feeStr!==''&&!isNaN(parseFloat(feeStr))) t.fee=parseFloat(feeStr);
   var fres=document.getElementById('fReserve');
   if(kind==='spot' && !isFundSel && fres && fres.checked) t.reserve=true;
@@ -1113,7 +1124,7 @@ document.getElementById('addBtn').onclick=()=>{
   if(state.prices[code]==null) state.prices[code]=px;
   save(); render();
   document.getElementById('fSh').value=''; document.getElementById('fPx').value=''; document.getElementById('fFee').value=''; document.getElementById('fDate').value='';
-  document.getElementById('fAmt').value=''; document.getElementById('fNav').value=''; document.getElementById('fRef').value='';
+  document.getElementById('fAmt').value=''; document.getElementById('fNav').value=''; document.getElementById('fRef').value=''; document.getElementById('fRecDate').value='';
   document.getElementById('fKind').value='spot';
   if(fres) fres.checked=false;
   document.getElementById('fCustomCode').value=''; document.getElementById('fCustomName').value='';
@@ -1144,6 +1155,8 @@ function applyFundMode(){
   document.getElementById('stockFields').style.display=fund?'none':'';
   document.getElementById('fundFields').style.display=fund?'block':'none';
   document.getElementById('refField').style.display=fund?'block':'none';
+  document.getElementById('recDateField').style.display=fund?'block':'none';
+  var ld=document.getElementById('lbDate'); if(ld) ld.textContent=fund?'交易日期（扣款日，可留空）':'日期（可留空）';
   var ks=document.getElementById('fKind');
   if(ks&&ks.options.length>=3){ ks.options[0].textContent=fund?'申購':'現買'; ks.options[1].textContent=fund?'定期申購':'定期'; ks.options[2].textContent=fund?'贖回':'賣出'; }
   var lf=document.getElementById('lbFee'); if(lf) lf.textContent=fund?'申購手續費 (NT$)':'手續費 (NT$)';
@@ -1344,7 +1357,6 @@ document.getElementById('expBtn').onclick=()=>{
 };
 document.getElementById('impBtn').onclick=()=>document.getElementById('impFile').click();
 document.getElementById('impFile').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{state=normalize(JSON.parse(r.result)); save(); render(); alert('已匯入');}catch(x){alert('檔案格式不對');} }; r.readAsText(f); };
-document.getElementById('resetBtn').onclick=()=>{ if(confirm('重置成初始資料？目前資料會清除。')){state=structuredClone(SEED); save(); render();} };
 
 // tabs
 function switchTab(name){
@@ -1363,7 +1375,7 @@ function openLightbox(code){
   var rows=list.map(function(o){ var t=o.tx, amt=(Number(t.sh)||0)*(Number(t.px)||0), fee=txFee(t);
     return '<div class="tdrow oneline" style="cursor:default">'+
       '<span class="kbadge '+(t.kind==='sell'?'sell':(t.kind==='dca'?'dca':'spot'))+'">'+kindLabelOf(t)+'</span>'+
-      '<span class="tdd">'+(t.date||'未填日期')+(t.ref?' · #'+t.ref:'')+'</span>'+
+      '<span class="tdd">'+(t.date||'未填日期')+(t.recDate?' → 對帳 '+t.recDate:'')+(t.ref?' · #'+t.ref:'')+'</span>'+
       '<span class="tdq num">'+shStr(t.code,t.sh)+' '+unitWord(t.code)+' × '+fmt2(t.px)+'</span>'+
       '<span class="tda num">'+fmt(t.kind==='sell'?amt:amt+fee)+'</span></div>';
   }).join('') || '<p class="note" style="margin:0">這個標的還沒有交易記錄。</p>';
