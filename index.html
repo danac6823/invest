@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#10302E">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="投資追蹤">
+<title>豐盛投資追蹤</title>
+<style>
+:root{
+  --ink:#10302E; --ink2:#1C4A45; --paper:#EDF0EC; --card:#FFFFFF;
+  --line:#D8DED7; --muted:#69736C; --gold:#A8842C;
+  --up:#C8312B; --down:#1F8A4C;
+  --c-stock:#7A5C9E; --c-tw:#B8893A; --c-us:#2F6E8F;
+  --r:14px; --sh:0 1px 3px rgba(16,48,46,.08), 0 6px 18px rgba(16,48,46,.05);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
+  background:var(--paper); color:var(--ink); line-height:1.5;
+  -webkit-font-smoothing:antialiased; padding-bottom:84px;
+}
+.num{font-variant-numeric:tabular-nums; letter-spacing:.2px}
+header{
+  position:sticky; top:0; z-index:20; background:var(--ink); color:#EAF0EC;
+  padding:calc(env(safe-area-inset-top) + 14px) 18px 13px;
+  display:flex; align-items:baseline; justify-content:space-between;
+  box-shadow:0 2px 12px rgba(16,48,46,.18);
+}
+header .brand{font-size:18px; font-weight:700; letter-spacing:1px}
+header .brand small{display:block; font-size:10px; font-weight:400; letter-spacing:3px; color:#8FB0A6; margin-top:2px}
+header .upd{font-size:11px; color:#9FBAB1; text-align:right}
+main{max-width:560px; margin:0 auto; padding:16px}
+section{display:none; animation:fade .25s ease}
+section.on{display:block}
+@keyframes fade{from{opacity:0; transform:translateY(4px)}to{opacity:1; transform:none}}
+@media (prefers-reduced-motion:reduce){section,*{animation:none!important; transition:none!important}}
+
+.card{background:var(--card); border-radius:var(--r); box-shadow:var(--sh); padding:18px; margin-bottom:14px}
+.eyebrow{font-size:11px; letter-spacing:2.5px; color:var(--muted); text-transform:uppercase; margin:0 0 10px}
+h2.sec{font-size:13px; letter-spacing:1px; color:var(--ink2); margin:22px 4px 10px; font-weight:700}
+
+/* hero */
+.hero{background:linear-gradient(160deg,var(--ink),var(--ink2)); color:#EAF0EC}
+.hero .eyebrow{color:#8FB0A6}
+.hero .total{font-size:40px; font-weight:700; line-height:1.05; margin:2px 0 6px}
+.hero .total .cur{font-size:18px; font-weight:500; color:#9FBAB1; margin-right:4px}
+.delta{display:inline-flex; align-items:center; gap:6px; font-size:15px; font-weight:600}
+.delta .chip{font-size:12px; padding:2px 8px; border-radius:20px; background:rgba(255,255,255,.12)}
+.hero .ruler{height:1px; background:rgba(255,255,255,.16); margin:16px 0 14px}
+.hero .triple{display:flex; gap:0}
+.hero .triple div{flex:1; text-align:center}
+.hero .triple .k{font-size:10.5px; letter-spacing:1px; color:#8FB0A6; margin-bottom:3px}
+.hero .triple .v{font-size:15px; font-weight:600}
+.hero .triple div+div{border-left:1px solid rgba(255,255,255,.14)}
+
+/* ribbon */
+.ribbon{display:flex; height:30px; border-radius:8px; overflow:hidden; margin:4px 0 12px; box-shadow:inset 0 0 0 1px rgba(0,0,0,.04)}
+.ribbon span{display:flex; align-items:center; justify-content:center; font-size:11px; color:#fff; font-weight:600; min-width:0; transition:flex-basis .4s ease}
+.legend{display:flex; flex-direction:column; gap:8px}
+.legend .row{display:flex; align-items:center; gap:9px; font-size:13.5px}
+.legend .dot{width:11px; height:11px; border-radius:3px; flex:none}
+.legend .row .lv{margin-left:auto; font-weight:600}
+.legend .row .lp{color:var(--muted); width:54px; text-align:right; font-size:12.5px}
+
+/* action */
+.action{display:flex; gap:12px; align-items:flex-start}
+.action .mark{width:6px; align-self:stretch; border-radius:6px; background:var(--gold); flex:none}
+.action.go .mark{background:var(--up)}
+.action h3{margin:0 0 4px; font-size:15px}
+.action p{margin:0; font-size:13px; color:var(--muted)}
+
+.kv{display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--line); font-size:14px}
+.kv:last-child{border-bottom:0}
+.kv .k{color:var(--muted)}
+.kv .v{font-weight:600}
+.pos{color:var(--up)} .neg{color:var(--down)} .zero{color:var(--muted)}
+.note{font-size:12px; color:var(--muted); margin:8px 2px 0}
+
+/* plan list */
+ul.plan{list-style:none; margin:0; padding:0}
+ul.plan li{display:flex; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); font-size:13.5px; align-items:flex-start}
+ul.plan li:last-child{border-bottom:0}
+ul.plan li b{color:var(--gold); flex:none; width:18px; text-align:center}
+
+/* holdings */
+.hold{border-bottom:1px solid var(--line); padding:14px 0}
+.hold:last-child{border-bottom:0}
+.hold .top{display:flex; justify-content:space-between; align-items:baseline}
+.hold .nm{font-weight:700; font-size:15px}
+.hold .nm small{font-weight:400; color:var(--muted); font-size:12px; margin-left:6px}
+.hold .val{font-weight:700; font-size:15px}
+.hold .meta{display:flex; gap:14px; font-size:12px; color:var(--muted); margin-top:5px; flex-wrap:wrap; align-items:center}
+.hold .meta .pl{font-weight:600}
+.priceset{display:flex; align-items:center; gap:6px; margin-left:auto}
+.priceset label{font-size:11px; color:var(--muted)}
+input.px{width:78px; padding:5px 7px; border:1px solid var(--line); border-radius:8px; font-size:13px; text-align:right; font-variant-numeric:tabular-nums; background:#FCFCFB}
+input.px:focus{outline:2px solid var(--ink2); outline-offset:1px; border-color:var(--ink2)}
+
+/* form */
+.field{margin-bottom:12px}
+.field label{display:block; font-size:12px; color:var(--muted); margin-bottom:5px; letter-spacing:.3px}
+.field input,.field select{width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:10px; font-size:15px; background:#FCFCFB; font-family:inherit; color:var(--ink)}
+.field input:focus,.field select:focus{outline:2px solid var(--ink2); outline-offset:1px; border-color:var(--ink2)}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+button.btn{width:100%; padding:13px; border:0; border-radius:10px; background:var(--ink); color:#fff; font-size:15px; font-weight:600; font-family:inherit; cursor:pointer}
+button.btn:active{background:var(--ink2)}
+button.btn.ghost{background:transparent; color:var(--ink); border:1px solid var(--line)}
+
+/* tx list */
+.tx{display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--line); font-size:13.5px}
+.tx:last-child{border-bottom:0}
+.tx .tg{font-size:10px; padding:2px 7px; border-radius:20px; background:var(--paper); color:var(--muted); flex:none}
+.tx .tnm{font-weight:600}
+.tx .tsub{color:var(--muted); font-size:12px}
+.tx .tamt{margin-left:auto; text-align:right; font-weight:600; font-variant-numeric:tabular-nums}
+.tx .del{flex:none; width:26px; height:26px; border-radius:50%; border:1px solid var(--line); background:#fff; color:var(--muted); font-size:14px; line-height:1; cursor:pointer}
+.tx .del:active{background:var(--paper)}
+
+/* target track */
+.track{margin:6px 0 2px}
+.track .bar{height:9px; border-radius:6px; background:var(--paper); overflow:hidden; position:relative; margin:6px 0}
+.track .fill{height:100%; border-radius:6px}
+.track .tk{display:flex; justify-content:space-between; font-size:12.5px}
+.target-line{position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--ink)}
+
+.tools{display:flex; gap:10px}
+.tools button{flex:1}
+
+/* tab bar */
+nav{position:fixed; bottom:0; left:0; right:0; z-index:30; background:rgba(255,255,255,.96); backdrop-filter:blur(10px); border-top:1px solid var(--line); display:flex; padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1; border:0; background:none; padding:9px 0 8px; color:var(--muted); font-size:10.5px; font-family:inherit; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:3px}
+nav button .ic{font-size:19px; line-height:1}
+nav button.on{color:var(--ink)}
+nav button.on .ic{transform:translateY(-1px)}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">豐盛投資追蹤<small>紀律 ＞ 預測</small></div>
+  <div class="upd">更新<br><span id="updDate" class="num">—</span></div>
+</header>
+
+<main>
+  <!-- 總覽 -->
+  <section id="tab-home" class="on">
+    <div class="card hero">
+      <p class="eyebrow">目前總市值</p>
+      <div class="total num"><span class="cur">NT$</span><span id="hTotal">—</span></div>
+      <div class="delta"><span id="hDelta" class="num">—</span><span id="hChip" class="chip num">—</span></div>
+      <div class="ruler"></div>
+      <div class="triple">
+        <div><div class="k">投入成本</div><div class="v num" id="hCost">—</div></div>
+        <div><div class="k">每月投入</div><div class="v num" id="hMon">—</div></div>
+        <div><div class="k">預備金</div><div class="v num" id="hRes">—</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">資產分佈</p>
+      <div class="ribbon" id="ribbon"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="card">
+      <div class="action" id="actionCard">
+        <div class="mark"></div>
+        <div><h3 id="actTitle">—</h3><p id="actBody">—</p></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">配置計畫摘要 · 方案二</p>
+      <ul class="plan">
+        <li><b>月</b><div>每月 30,000：台股大盤 21,000（006208，5號/15號各 10,500）＋ 標普500 9,000（VOO 或 00646，10號）</div></li>
+        <li><b>標</b><div>核心 ETF 目標 70% 台股大盤 ／ 30% 標普500</div></li>
+        <li><b>跌</b><div>50,000 預備金：大盤回檔 −10% 投 25,000、−20% 再投 25,000，投入標普500</div></li>
+        <li><b>衡</b><div>每年 12 月再平衡一次，偏離 >5% 才調整，平常不看盤</div></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 記錄 -->
+  <section id="tab-tx">
+    <div class="card">
+      <p class="eyebrow">新增一筆買進</p>
+      <div class="field">
+        <label>標的</label>
+        <select id="fCode"></select>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>股數</label><input id="fSh" type="number" inputmode="decimal" placeholder="0"></div>
+        <div class="field"><label>單價 (NT$)</label><input id="fPx" type="number" inputmode="decimal" placeholder="0"></div>
+      </div>
+      <div class="field"><label>日期（可留空）</label><input id="fDate" type="date"></div>
+      <button class="btn" id="addBtn">＋ 加入記錄</button>
+      <p class="note">金額一律以新台幣計。買 VOO 請輸入台幣換算金額，或改用台幣計價的 00646。</p>
+    </div>
+    <div class="card">
+      <p class="eyebrow">交易記錄 <span id="txCount" class="num"></span></p>
+      <div id="txList"></div>
+    </div>
+  </section>
+
+  <!-- 持倉 -->
+  <section id="tab-hold">
+    <div class="card">
+      <p class="eyebrow">持倉與損益 · 更新現價即時重算</p>
+      <div id="holdList"></div>
+    </div>
+    <div class="card">
+      <p class="eyebrow">參考指標 · 非追蹤目標</p>
+      <div class="kv"><span class="k">台積電穿透曝險</span><span class="v num" id="ltTsmc">—</span></div>
+      <div class="kv"><span class="k">半導體（台積電+聯發科）穿透曝險</span><span class="v num" id="ltSemi">—</span></div>
+      <p class="note">穿透＝把 0050／006208 裡的成分股還原後，實際壓在該公司的比重。</p>
+    </div>
+  </section>
+
+  <!-- 配置 -->
+  <section id="tab-alloc">
+    <div class="card">
+      <p class="eyebrow">核心 ETF 配置 vs 目標 70 / 30</p>
+      <div class="track">
+        <div class="tk"><span>台股大盤</span><span class="num"><b id="coreTWp">—</b> / 目標 70%</span></div>
+        <div class="bar"><div class="fill" id="coreTWbar" style="background:var(--c-tw)"></div><div class="target-line" style="left:70%"></div></div>
+      </div>
+      <div class="track">
+        <div class="tk"><span>標普500</span><span class="num"><b id="coreUSp">—</b> / 目標 30%</span></div>
+        <div class="bar"><div class="fill" id="coreUSbar" style="background:var(--c-us)"></div><div class="target-line" style="left:30%"></div></div>
+      </div>
+      <div class="kv" style="margin-top:8px"><span class="k">再平衡建議</span><span class="v" id="rebalTip">—</span></div>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">每月定期定額 · 合計 30,000</p>
+      <div class="kv"><span class="k">5 號 · 006208（台股大盤）</span><span class="v num">10,500</span></div>
+      <div class="kv"><span class="k">15 號 · 006208（台股大盤）</span><span class="v num">10,500</span></div>
+      <div class="kv"><span class="k">10 號 · VOO／00646（標普500）</span><span class="v num">9,000</span></div>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">修正加碼預備金</p>
+      <div class="kv"><span class="k">大盤 −10% → 投入</span><span class="v num">25,000 → 標普500</span></div>
+      <div class="kv"><span class="k">大盤 −20% → 投入</span><span class="v num">25,000 → 標普500</span></div>
+      <div class="kv"><span class="k">已投入 (NT$)</span><span class="v"><input id="resUsed" class="px" type="number" inputmode="decimal"></span></div>
+      <div class="kv"><span class="k">剩餘預備金</span><span class="v num" id="resLeft">—</span></div>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">再平衡提醒</p>
+      <p class="note" style="margin-top:0">每年 12 月檢視一次。偏離目標 >5% 才把新月投入暫時多分給落後的那塊，讓比例回到 70/30。平常不看盤、不手動進出。</p>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">可用資金</p>
+      <div class="kv"><span class="k">交割戶餘額 (NT$)</span><span class="v"><input id="cashIn" class="px" type="number" inputmode="decimal"></span></div>
+      <div class="kv"><span class="k">預備金剩餘</span><span class="v num" id="cashRes">—</span></div>
+      <div class="kv"><span class="k">可用資金合計</span><span class="v num" id="cashTotal">—</span></div>
+      <p class="note">交割戶餘額要自己填——我看不到你的券商帳戶。填了就能一眼看到「現金＋預備金」的可動用資金。</p>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">成本設定 · 手續費</p>
+      <div class="kv"><span class="k">計入手續費</span><span class="v"><input id="feeOn" type="checkbox" style="width:20px;height:20px"></span></div>
+      <div class="kv"><span class="k">手續費折讓（6折填 0.6）</span><span class="v"><input id="feeDisc" class="px" type="number" inputmode="decimal" step="0.05"></span></div>
+      <div class="kv"><span class="k">最低手續費 (NT$)</span><span class="v"><input id="feeMin" class="px" type="number" inputmode="decimal"></span></div>
+      <div class="kv"><span class="k">累計買進手續費（估）</span><span class="v num" id="feeSum">—</span></div>
+      <p class="note">基本費率 0.1425%，買賣各收一次。賣出另有證交稅（個股 0.3%、ETF 0.1%），等你真的賣出時再算。</p>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">資料</p>
+      <div class="tools">
+        <button class="btn ghost" id="expBtn">匯出備份</button>
+        <button class="btn ghost" id="impBtn">匯入</button>
+        <button class="btn ghost" id="resetBtn">重置</button>
+      </div>
+      <input id="impFile" type="file" accept="application/json" style="display:none">
+      <p class="note">資料存在這支手機的瀏覽器裡。換手機或清快取前，記得先匯出備份。</p>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button data-tab="home" class="on"><span class="ic">◎</span>總覽</button>
+  <button data-tab="tx"><span class="ic">＋</span>記錄</button>
+  <button data-tab="hold"><span class="ic">▤</span>持倉</button>
+  <button data-tab="alloc"><span class="ic">◐</span>配置</button>
+</nav>
+
+<script>
+const KEY='hana_invest_v1';
+const CATALOG={
+  '2330':{name:'台積電',cat:'個股'},
+  '2454':{name:'聯發科',cat:'個股'},
+  '0050':{name:'元大台灣50',cat:'台股大盤'},
+  '006208':{name:'富邦台50',cat:'台股大盤'},
+  'VOO':{name:'標普500 VOO',cat:'美股大盤'},
+  '00646':{name:'元大標普500',cat:'美股大盤'},
+};
+const CATCOLOR={'個股':'var(--c-stock)','台股大盤':'var(--c-tw)','美股大盤':'var(--c-us)'};
+const SEED={
+  updated:'2026/06/24',
+  prices:{'2330':2490,'2454':4320,'0050':107.20,'006208':256},
+  weights:{tsmc:0.582,mtk:0.064},
+  reserveUsed:0, cash:0,
+  fee:{on:true, rate:0.001425, disc:0.6, min:1},
+  tx:[
+    {code:'2330',sh:10,px:2270},{code:'2330',sh:30,px:2290},{code:'2330',sh:5,px:2415},
+    {code:'2330',sh:5,px:2410},
+    {code:'2454',sh:5,px:4325},
+    {code:'0050',sh:93,px:104.98},{code:'0050',sh:100,px:102.60},{code:'0050',sh:200,px:102},
+    {code:'006208',sh:100,px:237.2},{code:'006208',sh:100,px:236.95},{code:'006208',sh:19,px:235.80},
+  ],
+};
+let state;
+function load(){ try{const s=localStorage.getItem(KEY); state=s?JSON.parse(s):structuredClone(SEED);}catch(e){state=structuredClone(SEED);} if(!state.prices)state.prices={}; if(state.reserveUsed==null)state.reserveUsed=0; if(state.cash==null)state.cash=0; if(!state.fee)state.fee={on:true,rate:0.001425,disc:0.6,min:1}; }
+function save(){ try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){} }
+
+const fmt=n=>Math.round(n||0).toLocaleString('en-US');
+const fmt2=n=>(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const pct=x=>(x*100).toFixed(1)+'%';
+const plClass=n=> n>0?'pos':(n<0?'neg':'zero');
+
+function feeOf(amt){ const f=state.fee||{}; if(!f.on||!amt)return 0; return Math.max(amt*(f.rate||0)*(f.disc||1), f.min||0); }
+function holdings(){
+  const m={};
+  state.tx.forEach(t=>{
+    const sh=Number(t.sh)||0; if(!t.code||!sh) return;
+    const k=t.code, info=CATALOG[k]||{}, amt=sh*(Number(t.px)||0);
+    if(!m[k]) m[k]={code:k,name:t.name||info.name||k,cat:t.cat||info.cat||'其他',sh:0,cost:0,fee:0};
+    m[k].sh+=sh; m[k].cost+=amt; m[k].fee+=feeOf(amt);
+  });
+  return Object.values(m).map(h=>{
+    const px=Number(state.prices[h.code])||0, val=h.sh*px, net=h.cost+h.fee;
+    return {...h,px,val,net,avg:h.sh?net/h.sh:0,pnl:val-net,ret:net?(val-net)/net:0};
+  });
+}
+function totals(){
+  const hs=holdings();
+  const t={cost:0,fee:0,val:0,byCat:{'個股':0,'台股大盤':0,'美股大盤':0},tsmc:0,tw:0};
+  hs.forEach(h=>{ t.cost+=h.cost; t.fee+=h.fee; t.val+=h.val; if(t.byCat[h.cat]!=null)t.byCat[h.cat]+=h.val; if(h.code==='2330')t.tsmc+=h.val; if(h.cat==='台股大盤')t.tw+=h.val; });
+  t.net=t.cost+t.fee; t.pnl=t.val-t.net; t.ret=t.net?t.pnl/t.net:0;
+  const w=state.weights||SEED.weights;
+  t.ltTsmc=t.val?(t.tsmc+t.tw*w.tsmc)/t.val:0;
+  t.ltSemi=t.val?(t.byCat['個股']+t.tw*(w.tsmc+w.mtk))/t.val:0;
+  return {hs,t};
+}
+
+function render(){
+  document.getElementById('updDate').textContent=state.updated||'—';
+  const {hs,t}=totals();
+
+  // hero
+  document.getElementById('hTotal').textContent=fmt(t.val);
+  document.getElementById('hCost').textContent=fmt(t.net);
+  document.getElementById('hMon').textContent='30,000';
+  const left=(state.plan?.reserve??50000)-(state.reserveUsed||0);
+  document.getElementById('hRes').textContent=fmt(left<0?0:left);
+  const d=document.getElementById('hDelta'); d.textContent=(t.pnl>=0?'+':'−')+fmt(Math.abs(t.pnl))+' NT$';
+  d.style.color=t.pnl>0?'#FF9B91':(t.pnl<0?'#9FE3B8':'#cdd');
+  document.getElementById('hChip').textContent=(t.ret>=0?'+':'−')+pct(Math.abs(t.ret));
+
+  // ribbon + legend
+  const cats=[['個股',t.byCat['個股']],['台股大盤',t.byCat['台股大盤']],['美股大盤',t.byCat['美股大盤']]];
+  const rb=document.getElementById('ribbon'); rb.innerHTML='';
+  const lg=document.getElementById('legend'); lg.innerHTML='';
+  cats.forEach(([name,v])=>{
+    const p=t.val?v/t.val:0;
+    if(p>0){const s=document.createElement('span'); s.style.flexBasis=(p*100)+'%'; s.style.flexGrow=p; s.style.background=CATCOLOR[name]; s.textContent=p>=0.12?Math.round(p*100)+'%':''; rb.appendChild(s);}
+    const row=document.createElement('div'); row.className='row';
+    row.innerHTML=`<span class="dot" style="background:${CATCOLOR[name]}"></span><span>${name}</span><span class="lp num">${fmt(v)}</span><span class="lv num">${pct(p)}</span>`;
+    lg.appendChild(row);
+  });
+
+  // action card
+  const core=t.byCat['台股大盤']+t.byCat['美股大盤'];
+  const usShare=core?t.byCat['美股大盤']/core:0;
+  const ac=document.getElementById('actionCard'); const at=document.getElementById('actTitle'); const ab=document.getElementById('actBody');
+  if(Math.abs(usShare-0.30)>0.05){
+    ac.classList.add('go');
+    if(usShare<0.30){at.textContent='本月行動：投入標普500'; ab.textContent=`標普500 目前佔核心 ${pct(usShare)}，低於目標 30%。把每月 9,000（10號）投入 VOO 或 00646，慢慢補上。`;}
+    else{at.textContent='本月行動：台股大盤偏低'; ab.textContent=`標普500 已佔核心 ${pct(usShare)}，超過目標。新錢多分一點給台股大盤(006208)回到 70/30。`;}
+  }else{
+    ac.classList.remove('go');
+    at.textContent='配置在目標範圍'; ab.textContent='維持每月自動扣款即可，平常不用看盤。下次 12 月再平衡時檢視一次。';
+  }
+
+  // tx select
+  const sel=document.getElementById('fCode');
+  if(!sel.dataset.built){ sel.innerHTML=Object.entries(CATALOG).map(([c,i])=>`<option value="${c}">${i.name}（${c}）· ${i.cat}</option>`).join(''); sel.dataset.built='1'; }
+
+  // tx list
+  document.getElementById('txCount').textContent='· '+state.tx.length+' 筆';
+  const tl=document.getElementById('txList'); tl.innerHTML='';
+  [...state.tx].reverse().forEach((tx,ri)=>{
+    const idx=state.tx.length-1-ri; const info=CATALOG[tx.code]||{};
+    const amt=(Number(tx.sh)||0)*(Number(tx.px)||0);
+    const el=document.createElement('div'); el.className='tx';
+    el.innerHTML=`<span class="tg">${tx.cat||info.cat||''}</span>
+      <div><div class="tnm">${tx.name||info.name||tx.code} <small style="color:var(--muted)">${tx.code}</small></div>
+      <div class="tsub num">${fmt(tx.sh)} 股 × ${fmt2(tx.px)}${tx.date?' · '+tx.date:''}</div></div>
+      <div class="tamt">${fmt(amt)}</div>
+      <button class="del" aria-label="刪除" data-i="${idx}">✕</button>`;
+    tl.appendChild(el);
+  });
+  tl.querySelectorAll('.del').forEach(b=>b.onclick=()=>{ if(confirm('刪除這筆記錄？')){state.tx.splice(+b.dataset.i,1); save(); render();} });
+
+  // holdings
+  const hl=document.getElementById('holdList'); hl.innerHTML='';
+  if(!hs.length){ hl.innerHTML='<p class="note" style="margin:0">還沒有持倉。到「記錄」加入第一筆買進。</p>'; }
+  hs.forEach(h=>{
+    const el=document.createElement('div'); el.className='hold';
+    el.innerHTML=`<div class="top"><div class="nm">${h.name}<small>${h.code} · ${h.cat}</small></div><div class="val num">${fmt(h.val)}</div></div>
+      <div class="meta"><span class="num">${fmt(h.sh)} 股</span><span class="num">均價 ${fmt2(h.avg)}</span>
+      <span class="pl ${plClass(h.pnl)} num">${h.pnl>=0?'+':'−'}${fmt(Math.abs(h.pnl))}（${h.ret>=0?'+':'−'}${pct(Math.abs(h.ret))}）</span>
+      <span class="priceset"><label>現價</label><input class="px num" inputmode="decimal" data-code="${h.code}" value="${h.px}"></span></div>`;
+    hl.appendChild(el);
+  });
+  hl.querySelectorAll('input.px').forEach(inp=>inp.onchange=()=>{ const v=parseFloat(inp.value); if(!isNaN(v)){state.prices[inp.dataset.code]=v; const today=new Date(); state.updated=`${today.getFullYear()}/${String(today.getMonth()+1).padStart(2,'0')}/${String(today.getDate()).padStart(2,'0')}`; save(); render();} });
+
+  document.getElementById('ltTsmc').textContent=pct(t.ltTsmc);
+  document.getElementById('ltSemi').textContent=pct(t.ltSemi);
+
+  // alloc tab
+  document.getElementById('coreTWp').textContent=pct(core?t.byCat['台股大盤']/core:0);
+  document.getElementById('coreUSp').textContent=pct(usShare);
+  document.getElementById('coreTWbar').style.width=(core?t.byCat['台股大盤']/core*100:0)+'%';
+  document.getElementById('coreUSbar').style.width=(usShare*100)+'%';
+  document.getElementById('rebalTip').textContent=Math.abs(usShare-0.30)>0.05?'建議調整新錢比例':'維持';
+  document.getElementById('rebalTip').className='v '+(Math.abs(usShare-0.30)>0.05?'pos':'');
+  document.getElementById('resUsed').value=state.reserveUsed||0;
+  document.getElementById('resLeft').textContent=fmt((50000-(state.reserveUsed||0)));
+  const resLeft=50000-(state.reserveUsed||0);
+  document.getElementById('cashIn').value=state.cash||0;
+  document.getElementById('cashRes').textContent=fmt(resLeft);
+  document.getElementById('cashTotal').textContent=fmt((state.cash||0)+resLeft);
+  document.getElementById('feeOn').checked=!!state.fee.on;
+  document.getElementById('feeDisc').value=state.fee.disc;
+  document.getElementById('feeMin').value=state.fee.min;
+  document.getElementById('feeSum').textContent=fmt(t.fee);
+}
+
+// add tx
+document.getElementById('addBtn').onclick=()=>{
+  const code=document.getElementById('fCode').value;
+  const sh=parseFloat(document.getElementById('fSh').value);
+  const px=parseFloat(document.getElementById('fPx').value);
+  const date=document.getElementById('fDate').value;
+  if(!code||isNaN(sh)||sh<=0||isNaN(px)||px<=0){alert('請填寫股數與單價');return;}
+  const info=CATALOG[code];
+  state.tx.push({code,name:info.name,cat:info.cat,sh,px,date:date||''});
+  if(state.prices[code]==null) state.prices[code]=px;
+  save(); render();
+  document.getElementById('fSh').value=''; document.getElementById('fPx').value=''; document.getElementById('fDate').value='';
+  switchTab('hold');
+};
+document.getElementById('resUsed').onchange=e=>{ const v=parseFloat(e.target.value); state.reserveUsed=isNaN(v)?0:v; save(); render(); };
+document.getElementById('cashIn').onchange=e=>{ const v=parseFloat(e.target.value); state.cash=isNaN(v)?0:v; save(); render(); };
+document.getElementById('feeOn').onchange=e=>{ state.fee.on=e.target.checked; save(); render(); };
+document.getElementById('feeDisc').onchange=e=>{ const v=parseFloat(e.target.value); state.fee.disc=isNaN(v)?0:v; save(); render(); };
+document.getElementById('feeMin').onchange=e=>{ const v=parseFloat(e.target.value); state.fee.min=isNaN(v)?0:v; save(); render(); };
+
+// tools
+document.getElementById('expBtn').onclick=()=>{
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='投資追蹤備份.json'; a.click(); URL.revokeObjectURL(a.href);
+};
+document.getElementById('impBtn').onclick=()=>document.getElementById('impFile').click();
+document.getElementById('impFile').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{state=JSON.parse(r.result); save(); render(); alert('已匯入');}catch(x){alert('檔案格式不對');} }; r.readAsText(f); };
+document.getElementById('resetBtn').onclick=()=>{ if(confirm('重置成初始資料？目前資料會清除。')){state=structuredClone(SEED); save(); render();} };
+
+// tabs
+function switchTab(name){
+  document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id==='tab-'+name));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===name));
+  window.scrollTo({top:0,behavior:'instant'});
+}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+
+load(); render();
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "豐盛投資追蹤",
+  "short_name": "投資追蹤",
+  "description": "個人投資組合記錄與資產配置追蹤",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#10302E",
+  "theme_color": "#10302E",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
