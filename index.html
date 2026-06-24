@@ -240,6 +240,11 @@ button.btn.ghost{background:transparent; color:var(--ink); border:1px solid var(
 .tx .tsub{color:var(--muted); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .tx .tamt{margin-left:auto; text-align:right; font-weight:600; font-variant-numeric:tabular-nums; flex:none}
 .resbadge{display:inline-block; font-size:10px; font-weight:700; color:#6b4e00; background:rgba(196,150,58,.18); border:1px solid rgba(196,150,58,.45); padding:1px 6px; border-radius:6px; vertical-align:middle}
+.ftab{width:100%; border-collapse:collapse; font-size:13px}
+.ftab th{text-align:left; color:var(--muted); font-weight:600; padding:6px 8px; border-bottom:1px solid var(--line); font-size:12px}
+.ftab td{padding:7px 8px; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums}
+.ftab tr:last-child td{border-bottom:0}
+.ftab td:first-child{font-weight:600; white-space:nowrap}
 .tx .del{flex:none; width:26px; height:26px; border-radius:50%; border:1px solid var(--line); background:#fff; color:var(--muted); font-size:15px; line-height:1; cursor:pointer}
 .tx .del:active{background:var(--paper)}
 .txfilter{border:1px solid var(--line); border-radius:8px; padding:5px 8px; font-size:13px; font-family:inherit; background:#FCFCFB; color:var(--ink); max-width:58%}
@@ -509,6 +514,35 @@ nav button.on .ic{transform:translateY(-1px)}
         <div class="tools"><button class="btn" id="wfSave">加入觀察</button><button class="btn ghost" id="wfCancel">取消</button></div>
       </div>
       <p class="note">錨點＝近期高點（預設帶你輸入過的最高現價，可手動改成 52 週高）。95折/9折/85折/8折＝高點×0.95/0.9/0.85/0.8，加碼力度 0.5／1／1.5／2 倍。觸發時用上方預備金分批加碼。「觀察標的」是還沒持有、先放進來盯加碼價；買進後可直接記錄、它就變成正式持倉。逢低加碼較適合分散型 ETF；台積電、聯發科等單一個股請保守看待。</p>
+    </div>
+
+    <div class="card">
+      <div class="cardhead" id="histToggle"><p class="eyebrow" style="margin:0">📉 台股歷史回檔頻率 · 參考</p><span class="chev" id="histChev">›</span></div>
+      <div id="histBody" style="display:none; margin-top:10px">
+        <table class="ftab">
+          <tr><th>回檔深度</th><th>性質</th><th>大致頻率</th></tr>
+          <tr><td>−5%（95折）</td><td>一般波動</td><td>一年好幾次</td></tr>
+          <tr><td>−10%（9折）</td><td>修正</td><td>約一年一次</td></tr>
+          <tr><td>−15%（85折）</td><td>較深修正</td><td>約 1.5～3 年</td></tr>
+          <tr><td>−20%（8折）</td><td>熊市門檻</td><td>約 3～5 年</td></tr>
+          <tr><td>−30%（7折）</td><td>股災／熊市</td><td>約 5～10 年</td></tr>
+          <tr><td>−40% 以下</td><td>系統性崩盤</td><td>十年級、極稀少</td></tr>
+        </table>
+        <p class="note" style="margin:8px 0 0">以台股加權指數 1990 年至今的回檔分布概估，非精算。重點：<b>越深的跌幅越稀少，但事後多是長期買點</b>。8 折幾年一遇、要備好；7 折五到十年一遇、當保險檔保留銀彈。僅供心理參考，不預測未來。</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="cardhead" id="noviceToggle"><p class="eyebrow" style="margin:0">🌱 新手加碼建議 · 兩階段</p><span class="chev" id="noviceChev">›</span></div>
+      <div id="noviceBody" style="display:none; margin-top:10px">
+        <ul class="plan">
+          <li><b>一</b><div><b>第一階段（前 6–12 個月）</b>：先把定期定額執行穩，<b>暫不主動逢低加碼</b>。定期定額本身就會在低點自動買到更多單位。先經歷一次下跌、認識自己的反應（會不會慌、想不想停扣）。</div></li>
+          <li><b>二</b><div><b>第二階段（撐過第一次下跌後）</b>：再啟用加碼，從溫和兩檔開始——9折(−10%) 力道 <b>1</b>、8折(−20%) 力道 <b>1.5～2</b>。心態穩了，再逐步往深跌凸形（如 1／1.5／2.5／4）進化。</div></li>
+          <li><b>心</b><div>新手第一年的頭號目標是<b>不被一次下跌嚇出場</b>。保住「留在場上」比「抄到最低點」重要。力道是隨經驗加上去的，不是一開始就上滿。</div></li>
+          <li><b>限</b><div>逢低加碼只適合分散型大盤 ETF（0050／006208／VOO）。個股、科技基金跌深可能是基本面轉壞，別無腦加碼。</div></li>
+        </ul>
+        <p class="note" style="margin:6px 0 0">一般性投資紀律參考，非個別投資建議；實際配置依你的財務狀況與風險承受度決定。</p>
+      </div>
     </div>
 
     <div class="card">
@@ -1139,6 +1173,8 @@ document.getElementById('addToggle').onclick=function(){ var b=document.getEleme
 function setPlanForm(open){ var b=document.getElementById('planBody'), c=document.getElementById('planChev'); if(!b)return; b.style.display=open?'block':'none'; if(c)c.textContent=open?'⌄':'›'; }
 document.getElementById('planToggle').onclick=function(){ var b=document.getElementById('planBody'); setPlanForm(b.style.display==='none'); };
 document.getElementById('fundHelpToggle').onclick=function(){ var b=document.getElementById('fundHelpBody'), c=document.getElementById('fundHelpChev'); var open=b.style.display==='none'; b.style.display=open?'block':'none'; c.textContent=open?'⌄':'›'; };
+document.getElementById('histToggle').onclick=function(){ var b=document.getElementById('histBody'), c=document.getElementById('histChev'); var open=b.style.display==='none'; b.style.display=open?'block':'none'; c.textContent=open?'⌄':'›'; };
+document.getElementById('noviceToggle').onclick=function(){ var b=document.getElementById('noviceBody'), c=document.getElementById('noviceChev'); var open=b.style.display==='none'; b.style.display=open?'block':'none'; c.textContent=open?'⌄':'›'; };
 document.getElementById('fCode').onchange=function(){ document.getElementById('customFields').style.display = this.value==='__custom__'?'block':'none'; applyFundMode(); renderAssist(); };
 ['fSh','fPx','fFee','fKind','fCustomCode','fCustomName','fCustomCat','fAmt','fNav'].forEach(function(id){ var el=document.getElementById(id); if(el){ el.addEventListener('input', renderAssist); el.addEventListener('change', renderAssist); } });
 ['fAmt','fNav'].forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('input', updateUnits); });
