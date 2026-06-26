@@ -221,6 +221,7 @@ input.px:focus{outline:2px solid var(--ink2); outline-offset:1px; border-color:v
 .lv{display:flex; justify-content:space-between; align-items:center; font-size:13.5px; padding:7px 10px; border-radius:9px; background:var(--paper); font-variant-numeric:tabular-nums}
 .lv.on{background:rgba(200,49,43,.10); border:1px solid rgba(200,49,43,.30)}
 .lv .hit{color:var(--up); font-weight:700}
+.lv .qty{font-size:11px; color:var(--muted); font-weight:600}
 
 /* form */
 .field{margin-bottom:12px}
@@ -871,6 +872,7 @@ function catLabel(c){ return CATLABEL[c]||c||''; }
 function kindLabel(k){ return k==='sell'?'賣出':(k==='dca'?'定期':'現買'); }
 const FUND_COLOR='#3F7C8C';
 function unitWord(code){ return isFund(code)?'單位':'股'; }
+function qtyTxt(code,amt,p){ if(!(amt>0)||!(p>0)) return ''; var q=amt/p; if(isFund(code)) return '≈'+q.toFixed(2)+'單位'; var sh=Math.round(q); if(sh<1) return '≈'+q.toFixed(1)+'股'; var s='≈'+fmt(sh)+'股'; if(sh>=1000){ var lots=sh/1000; s+='·'+(Number.isInteger(lots)?lots:lots.toFixed(2))+'張'; } return s; }
 function shStr(code,sh){ return isFund(code)?fmt2(sh):fmt(sh); }
 function dispCatOf(code,cat){ return isFund(code)?'基金':catLabel(cat||meta(code).cat); }
 function kindLabelOf(t){ var f=isFund(t.code); if(t.kind==='sell') return f?'贖回':'賣出'; if(t.kind==='dca') return f?'定期申購':'定期'; return f?'申購':'現買'; }
@@ -1759,7 +1761,7 @@ function renderAdd(){
   var heldCodes={}; hs.forEach(function(h){heldCodes[h.code]=true;});
   var watch=(state.watch||[]).filter(function(c){return !heldCodes[c];});
   if(!hs.length && !watch.length){ el.innerHTML='<p class="note" style="margin:0">還沒有持倉。買進後、或用下方「新增觀察標的」，就會出現各標的的加碼表。</p>'; return; }
-  function ladder(code,anchor,price,avg){ return levels.map(function(L){ var trig=anchor*L[0], amt=Math.round(base*L[2]), hit=price>0&&price<=trig, key=code+'|'+L[1], fired=state.fired&&state.fired[key]; var tag=(avg>0)?(trig<avg?'<span class="dtag ok">攤平</span>':'<span class="dtag up">墊高</span>'):''; var right=hit?'<span class="hit">可加碼 +'+fmt(amt)+'</span>':(price>0?('再跌 '+((price-trig)/price*100).toFixed(1)+'% · +'+fmt(amt)):('+'+fmt(amt))); var tog='<button class="firetog'+(fired?' done':'')+'" data-key="'+key+'" data-amt="'+amt+'">'+(fired?'✓已加碼':'勾記')+'</button>'; return '<div class="lv'+(hit?' on':'')+(fired?' fired':'')+'"><span>'+L[1]+'　'+fmt2(trig)+tag+'</span><span class="lvr">'+right+tog+'</span></div>'; }).join(''); }
+  function ladder(code,anchor,price,avg){ return levels.map(function(L){ var trig=anchor*L[0], amt=Math.round(base*L[2]), hit=price>0&&price<=trig, key=code+'|'+L[1], fired=state.fired&&state.fired[key]; var tag=(avg>0)?(trig<avg?'<span class="dtag ok">攤平</span>':'<span class="dtag up">墊高</span>'):''; var q=qtyTxt(code,amt,trig), qh=q?' <span class="qty">'+q+'</span>':''; var right=hit?('<span class="hit">可加碼 +'+fmt(amt)+'</span>'+qh):(price>0?('再跌 '+((price-trig)/price*100).toFixed(1)+'% · +'+fmt(amt)+qh):('+'+fmt(amt)+qh)); var tog='<button class="firetog'+(fired?' done':'')+'" data-key="'+key+'" data-amt="'+amt+'">'+(fired?'✓已加碼':'勾記')+'</button>'; return '<div class="lv'+(hit?' on':'')+(fired?' fired':'')+'"><span>'+L[1]+'　'+fmt2(trig)+tag+'</span><span class="lvr">'+right+tog+'</span></div>'; }).join(''); }
   function avgAdvice(h){ var avg=h.avg||0, px=h.px||0; if(!(avg>0)) return ''; var s='<div class="avgadv">'; if(px>0&&px>=avg){ var denom=px-avg*1.02, lim; if(denom<=0){ s+='⚠ 現價 '+fmt2(px)+' <b>高於</b>均價 '+fmt2(avg)+'：加碼會<b>墊高</b>成本（非攤平），但墊高幅度 ≤2%，可正常加碼。'; } else { var n=avg*h.sh*0.02/denom; lim=n*px; s+='⚠ 現價 '+fmt2(px)+' <b>高於</b>均價 '+fmt2(avg)+'：加碼會<b>墊高</b>成本。若仍要加，建議<b>限約 NT$'+fmt(Math.round(lim))+'</b>（加碼後均價墊高 ≤2%），別追量。'; } } else if(px>0){ if(base>0){ var nsh=base/px, navg=(h.net+base)/(h.sh+nsh); s+='✓ 現價 '+fmt2(px)+' <b>低於</b>均價 '+fmt2(avg)+'：加碼會<b>攤平</b>成本，可正常或加量。例：加 NT$'+fmt(Math.round(base))+'，均價約降到 '+fmt2(navg)+'。'; } else { s+='✓ 現價 '+fmt2(px)+' <b>低於</b>均價 '+fmt2(avg)+'：加碼會<b>攤平</b>成本，可正常或加量。'; } } s+='</div>'; return s; }
   var heldHtml=hs.map(function(h){
     var anchor=anchorOf(h.code), price=h.px;
