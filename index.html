@@ -519,29 +519,18 @@ nav button.on .ic{transform:translateY(-1px)}
 
 <main>
   <!-- 總覽 -->
-  <section id="tab-home" class="on">
-    <div id="dueBanner"></div>
-    <div id="saleBanner"></div>
-
+  <section id="tab-home">
     <div class="card starcard starmini" id="starCard">
       <div class="starrow"><span class="stareye">🌱 紀律北極星</span><span id="starMonth" class="starbadge">—</span></div>
       <div id="starStreak" class="starbig">—</div>
       <div id="starSub" class="note" style="margin:3px 0 0">—</div>
     </div>
 
-    <div class="card firstrun" id="firstRunCard" style="display:none">
-      <p class="frtitle">🌱 歡迎開始豐盛之路</p>
-      <p class="frsub">三步就上手，之後每月照著做就好。</p>
-      <button class="frstep" id="frStep1" data-go="cash:addCash"><span class="frn">1</span><span class="frt">先記一筆入金（你的本金）</span><span class="frx">›</span></button>
-      <button class="frstep" id="frStep2" data-go="modal:plan"><span class="frn">2</span><span class="frt">設定每月定期定額</span><span class="frx">›</span></button>
-      <button class="frstep" id="frStep3" data-go="modal:add"><span class="frn">3</span><span class="frt">買進後，記一筆</span><span class="frx">›</span></button>
-    </div>
-
     <div class="homesec">💰 我的狀態</div>
     <div class="tiles4">
-      <button class="tile4" data-go="hold"><span class="tk4">總市值 · 點看持倉<span class="ic4">›</span></span><span class="tv4 num" id="tHoldVal">—</span><span class="tsub4 num delta" id="tHoldPnl"></span></button>
+      <button class="tile4" data-go="hold"><span class="tk4">總市值 · 點看總覽<span class="ic4">›</span></span><span class="tv4 num" id="tHoldVal">—</span><span class="tsub4 num delta" id="tHoldPnl"></span></button>
       <button class="tile4" data-go="tx"><span class="tk4">本月投入<span class="ic4">›</span></span><span class="tv4 num" id="tMoUse">—</span><span class="tsub4 num" id="tMoPlan"></span></button>
-      <button class="tile4" data-go="cash"><span class="tk4">交割戶餘額<span class="ic4">›</span></span><span class="tv4 num" id="tCash">—</span><span class="tsub4">買賣自動扣入</span></button>
+      <button class="tile4" data-go="home:cashCard"><span class="tk4">交割戶餘額<span class="ic4">›</span></span><span class="tv4 num" id="tCash">—</span><span class="tsub4">買賣自動扣入</span></button>
       <button class="tile4" data-go="alloc:resCard"><span class="tk4">預備金剩餘<span class="ic4">›</span></span><span class="tv4 num" id="tRes">—</span><span class="tsub4">逢深跌的子彈</span></button>
     </div>
 
@@ -552,23 +541,7 @@ nav button.on .ic{transform:translateY(-1px)}
       <button class="short" data-go="modal:plan"><span class="sic">📅</span>定期定額</button>
       <button class="short" data-go="alloc:addCard"><span class="shbadge" id="shSale"></span><span class="sic">🏷️</span>打折加碼表</button>
       <button class="short" data-go="hold:distCard"><span class="sic">📊</span>資產分佈</button>
-      <button class="short" data-go="learn"><span class="sic">📚</span>小抄工具</button>
-    </div>
-
-    <div class="card">
-      <div class="progtap" data-go="tx">
-        <div class="pgtop"><p class="eyebrow" style="margin:0">📊 本月進度 · <span id="moLabel" class="num">—</span></p><span class="pgmsg" id="moBudgetMsg">—</span></div>
-        <div class="mobar" style="margin:9px 0 8px"><div class="mobarfill" id="moBudgetFill"></div></div>
-        <div class="pgbot"><span>本月投入 <b class="num" id="moTotal">—</b></span><span>每月計畫 <b class="num" id="moPlan">—</b> <span class="ic4">›</span></span></div>
-      </div>
-      <details class="hint" style="margin-top:11px"><summary>看本月明細</summary>
-        <div class="moflow" style="margin-top:8px">
-          <div class="mor"><span class="mok">定期定額</span><span class="mov num" id="moDca">—</span></div>
-          <div class="mor"><span class="mok">現買（一般）</span><span class="mov num" id="moSpot">—</span></div>
-          <div class="mor" id="moResAddRow" style="display:none"><span class="mok">預備金加碼</span><span class="mov num" id="moResAdd">—</span></div>
-          <div class="mor" id="moSellRow" style="display:none"><span class="mok">賣出回收</span><span class="mov num" id="moSell">—</span></div>
-        </div>
-      </details>
+      <button class="short" data-go="learn:learnTop"><span class="sic">📚</span>小抄工具</button>
     </div>
 
     <div class="homesec">📋 接下來該做什麼</div>
@@ -582,6 +555,39 @@ nav button.on .ic{transform:translateY(-1px)}
     <div class="card relaxcard" id="relaxCard" style="display:none">
       <button class="relaxx" id="relaxX" aria-label="今天不再顯示">✕</button>
       <div class="relaxmsg" id="relaxMsg"></div>
+    </div>
+
+    <div class="homesec">🏦 交割帳戶</div>
+    <div class="card" id="cashCard">
+      <p class="eyebrow" style="margin:0 0 6px">交割帳戶餘額</p>
+      <div class="cashbig"><span class="cur">NT$</span> <span id="cashBal" class="num">—</span></div>
+      <p class="note" style="margin:0 0 10px">買進自動扣、賣出自動入帳。</p>
+      <div id="pendingSettle" class="pendbox" style="display:none"></div>
+      <button class="btn ghost" id="addCashBtn">＋ 入金／股利／出金</button>
+      <div id="cashForm" class="planform" style="display:none">
+        <div class="grid2">
+          <div class="field"><label>類型</label><select id="cfType"><option value="deposit">入金</option><option value="dividend">股利／股息</option><option value="withdraw">出金</option></select></div>
+          <div class="field"><label>金額 (NT$)</label><input id="cfAmt" class="money" type="text" inputmode="decimal" placeholder="0"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>日期</label><input id="cfDate" type="date"></div>
+          <div class="field"><label>備註（選填）</label><input id="cfNote" placeholder="例：6月股利"></div>
+        </div>
+        <div class="tools"><button class="btn" id="cfSave">儲存</button><button class="btn ghost" id="cfCancel">取消</button></div>
+      </div>
+      <div class="kv" style="margin-top:12px"><span class="k">預備金剩餘</span><span class="v num" id="cashRes">—</span></div>
+      <div class="kv"><span class="k">可用資金合計</span><span class="v num" id="cashTotal">—</span></div>
+      <details class="hint"><summary>怎麼用</summary><p class="note">買進／定期定額會自動扣出、賣出自動入帳；這裡只記入金、股利、出金。餘額滾動計算，可跟券商對帳。第一次用先記一筆「入金」＝你的本金。</p></details>
+      <div class="cashledger-h">明細</div>
+      <div id="cashList"></div>
+    </div>
+
+    <div class="homesec">📎 參考指標</div>
+    <div class="card">
+      <p class="eyebrow">參考指標 · 非追蹤目標</p>
+      <div class="kv"><span class="k">台積電穿透曝險</span><span class="v num" id="ltTsmc">—</span></div>
+      <div class="kv"><span class="k">半導體穿透曝險</span><span class="v num" id="ltSemi">—</span></div>
+      <details class="hint"><summary>什麼是穿透</summary><p class="note">穿透＝把 0050／006208 及基金裡的成分還原後，實際壓在台積電／半導體的比重。基金依各自成分權重計入（可在設定 ⚙ 調整）。</p></details>
     </div>
   </section>
 
@@ -673,8 +679,19 @@ nav button.on .ic{transform:translateY(-1px)}
 
   </section>
 
-  <!-- 持倉 -->
-  <section id="tab-hold">
+  <!-- 總覽（原持倉） -->
+  <section id="tab-hold" class="on">
+    <div id="dueBanner"></div>
+    <div id="saleBanner"></div>
+
+    <div class="card firstrun" id="firstRunCard" style="display:none">
+      <p class="frtitle">🌱 歡迎開始豐盛之路</p>
+      <p class="frsub">三步就上手，之後每月照著做就好。</p>
+      <button class="frstep" id="frStep1" data-go="cash:addCash"><span class="frn">1</span><span class="frt">先記一筆入金（你的本金）</span><span class="frx">›</span></button>
+      <button class="frstep" id="frStep2" data-go="modal:plan"><span class="frn">2</span><span class="frt">設定每月定期定額</span><span class="frx">›</span></button>
+      <button class="frstep" id="frStep3" data-go="modal:add"><span class="frn">3</span><span class="frt">買進後，記一筆</span><span class="frx">›</span></button>
+    </div>
+
     <div class="card emptystate" id="holdEmpty" style="display:none">
       <div class="esic">🌱</div>
       <div class="estitle">還沒有持倉</div>
@@ -695,6 +712,25 @@ nav button.on .ic{transform:translateY(-1px)}
         <div><div class="k">預備金</div><div class="v num" id="hRes">—</div></div>
       </div>
     </div>
+    <div class="card">
+      <p class="eyebrow">持倉與損益</p>
+      <div id="holdList"></div>
+    </div>
+    <div class="card">
+      <div class="progtap" data-go="tx">
+        <div class="pgtop"><p class="eyebrow" style="margin:0">📊 本月進度 · <span id="moLabel" class="num">—</span></p><span class="pgmsg" id="moBudgetMsg">—</span></div>
+        <div class="mobar" style="margin:9px 0 8px"><div class="mobarfill" id="moBudgetFill"></div></div>
+        <div class="pgbot"><span>本月投入 <b class="num" id="moTotal">—</b></span><span>每月計畫 <b class="num" id="moPlan">—</b> <span class="ic4">›</span></span></div>
+      </div>
+      <details class="hint" style="margin-top:11px"><summary>看本月明細</summary>
+        <div class="moflow" style="margin-top:8px">
+          <div class="mor"><span class="mok">定期定額</span><span class="mov num" id="moDca">—</span></div>
+          <div class="mor"><span class="mok">現買（一般）</span><span class="mov num" id="moSpot">—</span></div>
+          <div class="mor" id="moResAddRow" style="display:none"><span class="mok">預備金加碼</span><span class="mov num" id="moResAdd">—</span></div>
+          <div class="mor" id="moSellRow" style="display:none"><span class="mok">賣出回收</span><span class="mov num" id="moSell">—</span></div>
+        </div>
+      </details>
+    </div>
     <div class="card" id="valCard">
       <p class="eyebrow">📈 市值走勢 <span class="vlegend"><i class="vl vl1"></i>市值 <i class="vl vl2"></i>投入成本</span></p>
       <div id="valChart"></div>
@@ -703,16 +739,6 @@ nav button.on .ic{transform:translateY(-1px)}
       <p class="eyebrow">資產分佈</p>
       <div class="ribbon" id="ribbon"></div>
       <div class="legend" id="legend"></div>
-    </div>
-    <div class="card">
-      <p class="eyebrow">持倉與損益</p>
-      <div id="holdList"></div>
-    </div>
-    <div class="card">
-      <p class="eyebrow">參考指標 · 非追蹤目標</p>
-      <div class="kv"><span class="k">台積電穿透曝險</span><span class="v num" id="ltTsmc">—</span></div>
-      <div class="kv"><span class="k">半導體穿透曝險</span><span class="v num" id="ltSemi">—</span></div>
-      <details class="hint"><summary>什麼是穿透</summary><p class="note">穿透＝把 0050／006208 及基金裡的成分還原後，實際壓在台積電／半導體的比重。基金依各自成分權重計入（可在設定 ⚙ 調整）。</p></details>
     </div>
     </div>
   </section>
@@ -805,7 +831,7 @@ nav button.on .ic{transform:translateY(-1px)}
 
   <!-- 學習與工具 -->
   <section id="tab-learn">
-    <div class="card" style="background:transparent; border:0; box-shadow:none; padding:4px 2px 0">
+    <div class="card" id="learnTop" style="background:transparent; border:0; box-shadow:none; padding:4px 2px 0">
       <p class="eyebrow" style="font-size:15px">📚 學習與工具</p>
       <p class="note" style="margin:4px 0 0">參考小抄與試算／健檢工具，平常不必每天看，需要時來查。各卡點標題展開。</p>
     </div>
@@ -926,39 +952,13 @@ nav button.on .ic{transform:translateY(-1px)}
   </section>
 
   <!-- 交割 -->
-  <section id="tab-cash">
-    <div class="card">
-      <p class="eyebrow" style="margin:0 0 6px">交割帳戶餘額</p>
-      <div class="cashbig"><span class="cur">NT$</span> <span id="cashBal" class="num">—</span></div>
-      <p class="note" style="margin:0 0 10px">買進自動扣、賣出自動入帳。</p>
-      <div id="pendingSettle" class="pendbox" style="display:none"></div>
-      <button class="btn ghost" id="addCashBtn">＋ 入金／股利／出金</button>
-      <div id="cashForm" class="planform" style="display:none">
-        <div class="grid2">
-          <div class="field"><label>類型</label><select id="cfType"><option value="deposit">入金</option><option value="dividend">股利／股息</option><option value="withdraw">出金</option></select></div>
-          <div class="field"><label>金額 (NT$)</label><input id="cfAmt" class="money" type="text" inputmode="decimal" placeholder="0"></div>
-        </div>
-        <div class="grid2">
-          <div class="field"><label>日期</label><input id="cfDate" type="date"></div>
-          <div class="field"><label>備註（選填）</label><input id="cfNote" placeholder="例：6月股利"></div>
-        </div>
-        <div class="tools"><button class="btn" id="cfSave">儲存</button><button class="btn ghost" id="cfCancel">取消</button></div>
-      </div>
-      <div class="kv" style="margin-top:12px"><span class="k">預備金剩餘</span><span class="v num" id="cashRes">—</span></div>
-      <div class="kv"><span class="k">可用資金合計</span><span class="v num" id="cashTotal">—</span></div>
-      <details class="hint"><summary>怎麼用</summary><p class="note">買進／定期定額會自動扣出、賣出自動入帳；這裡只記入金、股利、出金。餘額滾動計算，可跟券商對帳。第一次用先記一筆「入金」＝你的本金。</p></details>
-      <div class="cashledger-h">明細</div>
-      <div id="cashList"></div>
-    </div>
-  </section>
 </main>
 
 <nav>
-  <button data-tab="home" class="on"><span class="ic">◎</span>總覽</button>
+  <button data-tab="hold" class="on"><span class="ic">◎</span>總覽</button>
   <button data-tab="tx"><span class="ic">＋</span>記錄</button>
-  <button data-tab="hold"><span class="ic">▤</span>持倉</button>
   <button data-tab="alloc"><span class="ic">◐</span>配置</button>
-  <button data-tab="cash"><span class="ic">＄</span>交割</button>
+  <button data-tab="home"><span class="ic">⋯</span>更多</button>
 </nav>
 
 <div class="lb" id="setModal">
@@ -2380,7 +2380,9 @@ document.getElementById('impFile').onchange=e=>{ const f=e.target.files[0]; if(!
 
 // tabs
 function switchTab(name){
-  document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id==='tab-'+name));
+  if(name==='cash'||name==='learn') name='home'; // 交割/學習已併入「更多」
+  var show = name==='home' ? ['tab-home','tab-learn'] : ['tab-'+name];
+  document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',show.indexOf(s.id)>=0));
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===name));
   window.scrollTo({top:0,behavior:'instant'});
   if(name==='alloc'){ var al=document.getElementById('addList'); if(al&&typeof fitRows==='function') fitRows(al); }
@@ -2545,6 +2547,21 @@ function fetchAutoPrices(){
         recordPrice(code,p);
         if(e.d&&e.d>latest) latest=e.d;
       });
+      // 歷史日收盤併入 priceHist（走勢圖、近3月高低、加碼判讀都靠它）
+      if(j.hist){
+        if(!state.priceHist) state.priceHist={};
+        var cs=dstr(-130);
+        Object.keys(j.hist).forEach(function(code){
+          var cur=state.priceHist[code]||[], have={};
+          cur.forEach(function(x){ have[x.d]=1; });
+          (j.hist[code]||[]).forEach(function(x){
+            var p2=Number(x&&x.p);
+            if(x&&x.d&&p2>0&&!have[x.d]){ cur.push({d:x.d,p:p2}); changed=true; }
+          });
+          cur.sort(function(a,b){ return a.d<b.d?-1:1; });
+          state.priceHist[code]=cur.filter(function(x){ return x.d>=cs; });
+        });
+      }
       if(!latest) return;
       var prev=state.autoPx&&state.autoPx.d;
       state.autoPx={at:j.updated||'', d:latest};

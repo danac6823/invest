@@ -34,14 +34,37 @@ async function getJson(url) {
   return r.json();
 }
 
-// 讀上一次的結果當底，抓不到的代號保留舊值
+// 讀上一次的結果當底，抓不到的代號保留舊值；hist = 近 130 天日收盤（供 app 畫走勢、算近3月高低）
 let prices = {};
+let hist = {};
 let prevJson = '';
 try {
   prevJson = readFileSync(OUT, 'utf8');
-  prices = JSON.parse(prevJson).prices || {};
+  const prev = JSON.parse(prevJson);
+  prices = prev.prices || {};
+  hist = prev.hist || {};
 } catch {}
-const before = JSON.stringify(prices);
+const before = JSON.stringify({ prices, hist });
+
+const HIST_DAYS = 130;
+function cutoffIso() {
+  return new Date(Date.now() - HIST_DAYS * 864e5).toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
+}
+function upsertHist(code, d, p) {
+  p = Number(p);
+  if (!d || !(p > 0)) return;
+  const arr = hist[code] || (hist[code] = []);
+  const i = arr.findIndex(x => x.d === d);
+  if (i >= 0) arr[i].p = p; else arr.push({ d, p });
+}
+function trimHist() {
+  const cs = cutoffIso();
+  for (const k of Object.keys(hist)) {
+    hist[k] = hist[k].filter(x => x.d >= cs).sort((a, b) => (a.d < b.d ? -1 : 1));
+    if (!hist[k].length) delete hist[k];
+  }
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 const errors = [];
 const setPx = (code, p, d, src, extra) => {
@@ -103,15 +126,95 @@ for (const [code, cnyesId] of Object.entries(FUNDS)) {
   } catch (e) { errors.push(`fund ${code}: ` + e.message); }
 }
 
+// ── 5. 歷史回補（node fetch-prices.mjs --backfill，一次性）──
+if (process.argv.includes('--backfill')) {
+  const rocSlashToIso = s => { // '115/10/01' → '2026-10-01'
+    const m = String(s || '').match(/^(\d{2,3})\/(\d{2})\/(\d{2})$/);
+    return m ? `${Number(m[1]) + 1911}-${m[2]}-${m[3]}` : null;
+  };
+  // 近 5 個月的月份清單
+  const months = [];
+  const now = new Date();
+  for (let k = 0; k < 5; k++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - k, 1);
+    months.push({ ym: `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}01`, slash: `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/01` });
+  }
+  // 上市：逐檔逐月
+  const tpexLeft = [];
+  for (const code of TW_CODES) {
+    let got = 0;
+    for (const m of months) {
+      try {
+        const j = await getJson(`https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date=${m.ym}&stockNo=${code}&response=json`);
+        for (const row of j.data || []) {
+          const d = rocSlashToIso(row[0]), close = Number(String(row[6]).replace(/,/g, ''));
+          if (d && close > 0) { upsertHist(code, d, close); got++; }
+        }
+      } catch {}
+      await sleep(250);
+    }
+    if (!got) tpexLeft.push(code);
+    else console.log(`backfill twse ${code}: ok`);
+  }
+  // 上櫃：上市抓不到的再試櫃買
+  for (const code of tpexLeft) {
+    let got = 0;
+    for (const m of months) {
+      try {
+        const j = await getJson(`https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingStock?code=${code}&date=${m.slash}&response=json`);
+        for (const row of (j.tables && j.tables[0] && j.tables[0].data) || []) {
+          const d = rocSlashToIso(row[0]), close = Number(String(row[6]).replace(/,/g, ''));
+          if (d && close > 0) { upsertHist(code, d, close); got++; }
+        }
+      } catch {}
+      await sleep(250);
+    }
+    console.log(`backfill tpex ${code}: ${got ? 'ok' : 'NO DATA'}`);
+  }
+  // VOO：Yahoo 6 個月收盤 × 當日匯率
+  try {
+    const y = await getJson('https://query1.finance.yahoo.com/v8/finance/chart/VOO?range=6mo&interval=1d');
+    const r = y.chart.result[0];
+    const fxj = await getJson('https://query1.finance.yahoo.com/v8/finance/chart/TWD=X?range=6mo&interval=1d');
+    const fr = fxj.chart.result[0];
+    const fxByDate = {};
+    (fr.timestamp || []).forEach((ts, i) => { const v = fr.indicators.quote[0].close[i]; if (v > 0) fxByDate[tsToIso(ts)] = v; });
+    const curFx = Number(prices.VOO && prices.VOO.fx) || 0;
+    let lastFx = curFx;
+    (r.timestamp || []).forEach((ts, i) => {
+      const usd = r.indicators.quote[0].close[i];
+      const d = tsToIso(ts);
+      const fx = fxByDate[d] || lastFx;
+      if (fxByDate[d]) lastFx = fxByDate[d];
+      if (usd > 0 && fx > 0) upsertHist('VOO', d, Math.round(usd * fx * 100) / 100);
+    });
+    console.log('backfill voo: ok');
+  } catch (e) { console.log('backfill voo: ' + e.message); }
+  // 基金：鉅亨 NAV 歷史
+  for (const [code, cnyesId] of Object.entries(FUNDS)) {
+    try {
+      const j = await getJson(`https://fund.api.cnyes.com/fund/api/v1/funds/${cnyesId}/nav?size=200`);
+      const it = j.items || {};
+      (it.tradeDate || []).forEach((ts, i) => { const nav = (it.nav || [])[i]; if (nav > 0) upsertHist(code, tsToIso(ts), nav); });
+      console.log(`backfill fund ${code}: ok`);
+    } catch (e) { console.log(`backfill fund ${code}: ` + e.message); }
+  }
+}
+
+// 今天的收盤也進歷史
+for (const [code, e] of Object.entries(prices)) upsertHist(code, e.d, e.p);
+trimHist();
+
 // ── 輸出（價格沒變就不動檔案，避免無意義的 commit）───
-if (JSON.stringify(prices) === before && prevJson) {
+if (JSON.stringify({ prices, hist }) === before && prevJson) {
   console.log('no price change, skip write', errors.length ? `(errors: ${errors.join('; ')})` : '');
 } else {
   const out = {
     updated: new Date().toISOString(),
     errors: errors.length ? errors : undefined,
     prices,
+    hist,
   };
-  writeFileSync(OUT, JSON.stringify(out, null, 1) + '\n');
+  writeFileSync(OUT, JSON.stringify(out) + '\n');
   console.log(`OK ${Object.keys(prices).length} codes`, errors.length ? `(errors: ${errors.join('; ')})` : '');
 }
