@@ -20,12 +20,14 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;height:100%}
+html{background:#fff} /* body 若因 iOS 視窗高度 bug 變短，底下露出的區域與 nav 同色，視覺上仍是吸底 */
 body{
   font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
   background:var(--paper); color:var(--ink); line-height:1.5;
   -webkit-font-smoothing:antialiased;
   display:flex; flex-direction:column; overflow:hidden; /* App 殼：body 不捲動，main 自己捲，nav 永遠置底 */
-  height:100dvh; /* iOS Safari：跟著工具列伸縮，nav 才會貼住可視底部 */
+  position:fixed; inset:0; height:auto; /* 釘死在可視視窗：iOS 新舊版都吸底，不依賴 dvh */
+  width:100%;
 }
 .num{font-variant-numeric:tabular-nums; letter-spacing:.2px}
 header{
@@ -953,6 +955,7 @@ nav button.on .ic{transform:translateY(-1px)}
         <p class="note" style="margin:8px 0 0">依你記錄的持倉、現金與計畫自動判斷，為 MJ老師公開教學心法的整理與自我對照，非投資建議。</p>
       </div>
     </div>
+    <p class="note" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v97</p>
   </section>
 
   <!-- 交割 -->
@@ -2764,6 +2767,14 @@ function fetchAutoPrices(){
 load(); autoBookDca(); render();
 fetchAutoPrices();
 document.addEventListener('visibilitychange',function(){ if(!document.hidden) fetchAutoPrices(); });
+// iOS：鍵盤收起或工具列伸縮後，可視視窗有時卡在縮小狀態 → 把視窗捲回原點強制校正
+if(window.visualViewport){
+  var vvT=null;
+  window.visualViewport.addEventListener('resize', function(){
+    clearTimeout(vvT);
+    vvT=setTimeout(function(){ window.scrollTo(0,0); document.documentElement.scrollTop=0; }, 120);
+  });
+}
 </script>
 <script>
 if ('serviceWorker' in navigator) {
