@@ -598,6 +598,7 @@ nav button.on .ic{transform:translateY(-1px)}
     </div>
 
     <div id="seg-add">
+    <button class="btn ghost" id="slipBtn" style="margin-bottom:12px">📋 貼交割憑單 · 自動入帳</button>
     <div class="card" id="addFormCard">
       <div class="cardhead" id="addToggle"><p class="eyebrow" style="margin:0">＋ 新增買進</p><span class="chev" id="addChev">›</span></div>
       <div id="addBody" style="display:none; margin-top:12px">
@@ -1036,6 +1037,17 @@ nav button.on .ic{transform:translateY(-1px)}
   </div>
 </div>
 
+<div class="lb" id="slipModal">
+  <div class="lbsheet">
+    <div class="lbtop"><div class="lbnm">貼交割憑單<small>把成交通知整封複製貼上，自動入帳</small></div><button class="lbclose" id="slipX">✕</button></div>
+    <textarea id="slipBox" rows="6" placeholder="打開券商「成交資料／交割憑單」通知 email，全選複製，貼在這裡" style="width:100%;margin-top:8px;border:1px solid var(--line);border-radius:9px;padding:9px;font-family:inherit;font-size:13px;resize:vertical;color:var(--ink);background:var(--paper)"></textarea>
+    <div class="tools" style="margin-top:8px"><button class="btn" id="slipParse">解析 ↓</button></div>
+    <p class="note" id="slipStatus" style="margin:7px 0 0">支援台新證券「成交資料」通知（現買／現賣）。手續費會直接帶入實際金額。</p>
+    <div id="slipList" style="margin-top:8px"></div>
+    <div class="tools" style="margin-top:14px"><button class="btn" id="slipImport" style="display:none">匯入勾選的交易</button><button class="btn ghost" id="slipCancel">取消</button></div>
+  </div>
+</div>
+
 <script>
 const KEY='hana_invest_v1';
 function grp(n){ if(n===''||n==null||isNaN(n)) return ''; var s=String(n), neg=s.charAt(0)==='-'?'-':''; s=s.replace('-',''); var p=s.split('.'); p[0]=p[0].replace(/\B(?=(\d{3})+(?!\d))/g,','); return neg+p.join('.'); }
@@ -1360,7 +1372,10 @@ function renderAssist(){
 
 function render(){
   document.getElementById('updDate').textContent=state.updated||'—';
-  (function(){ var hu=document.getElementById('hUpd'); if(!hu)return; if(!state.updated){ hu.textContent='報價尚未更新 · 點此批次填現價／淨值 ›'; return; } var m=String(state.updated).match(/(\d{4})\/(\d{2})\/(\d{2})/); if(!m){ hu.textContent='報價最後更新：'+state.updated; return; } var d=new Date(+m[1],+m[2]-1,+m[3]); var days=Math.floor((Date.now()-d.getTime())/86400000); var ago=days<=0?'今天':(days===1?'昨天':days+' 天前'); hu.textContent='報價最後更新：'+m[2]+'/'+m[3]+'（'+ago+'）'+(days>=7?' · 建議更新':'')+' · 點此批次更新 ›'; })();
+  (function(){ var hu=document.getElementById('hUpd'); if(!hu)return;
+    var ap=state.autoPx;
+    if(ap&&ap.d&&String(state.updated)===String(ap.d).replace(/-/g,'/')){ var ma=String(ap.d).match(/^(\d{4})-(\d{2})-(\d{2})$/); var dd=ma?new Date(+ma[1],+ma[2]-1,+ma[3]):null; var stale=dd?Math.floor((Date.now()-dd.getTime())/86400000)>=5:false; hu.textContent='⚡ 報價自動更新：'+(ma?ma[2]+'/'+ma[3]:ap.d)+' 收盤'+(stale?'（有點舊，點此手動補）':' · 點此可手動調整 ›'); return; }
+    if(!state.updated){ hu.textContent='報價尚未更新 · 點此批次填現價／淨值 ›'; return; } var m=String(state.updated).match(/(\d{4})\/(\d{2})\/(\d{2})/); if(!m){ hu.textContent='報價最後更新：'+state.updated; return; } var d=new Date(+m[1],+m[2]-1,+m[3]); var days=Math.floor((Date.now()-d.getTime())/86400000); var ago=days<=0?'今天':(days===1?'昨天':days+' 天前'); hu.textContent='報價最後更新：'+m[2]+'/'+m[3]+'（'+ago+'）'+(days>=7?' · 建議更新':'')+' · 點此批次更新 ›'; })();
   var fhc=document.getElementById('fundHelpCard'); if(fhc) fhc.style.display=state.fundOn?'':'none';
   const {hs,t}=totals();
   document.body.classList.toggle('focus', !!state.focusMode);
@@ -2204,12 +2219,15 @@ function quickLog(idx){
   applyFundMode();
   var d=new Date();
   document.getElementById('fDate').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  var cp=Number(state.prices&&state.prices[p.code])||0;
   if(isFund(p.code)){
     document.getElementById('fAmt').value=grp(p.amount);
     if(p.ref) document.getElementById('fRef').value=p.ref;
+    var fn=document.getElementById('fNav'); if(fn&&cp>0&&!fn.value) fn.value=cp;
     updateUnits();
     document.getElementById('fNav').focus();
   } else {
+    var fp=document.getElementById('fPx'); if(fp&&cp>0&&!fp.value) fp.value=cp;
     document.getElementById('fSh').focus();
   }
 }
@@ -2402,7 +2420,143 @@ function openLightbox(code){
   lb.onclick=function(e){ if(e.target===lb) closeLightbox(); };
 }
 function closeLightbox(){ document.getElementById('lightbox').classList.remove('on'); document.body.style.overflow=''; }
+
+// ═══ 交割憑單解析（台新證券成交通知）═══
+var SLIP_ALIAS={'台灣50':'0050','元大台灣50':'0050','富台50':'006208','富邦台50':'006208','公司治理':'00692','台積電':'2330','聯發科':'2454','鴻海':'2317','台達電':'2308','中華電':'2412','國泰金':'2882','富邦金':'2881','中信金':'2891','玉山金':'2884','長榮':'2603','聯電':'2303','元大高股息':'0056'};
+function slipCodeOf(name){
+  var nn=nq_(name).replace(/\s/g,'');
+  if(!nn) return '';
+  if(SLIP_ALIAS[nn]) return SLIP_ALIAS[nn];
+  for(var k in SLIP_ALIAS){ if(nn.indexOf(nq_(k))>=0) return SLIP_ALIAS[k]; }
+  var mc=mergedCatalog();
+  if(mc[nn]) return nn; // 直接貼代號
+  for(var c in mc){ var nm=nq_(mc[c].name||'').replace(/\s/g,''); if(nm&&(nm===nn||nm.indexOf(nn)>=0||nn.indexOf(nm)>=0)) return c; }
+  return '';
+}
+function parseSlip(text){
+  text=String(text||'');
+  // 日期：民國 115 年 11 月 5 日，或 2026/11/05
+  var date='', m=text.match(/(\d{2,4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
+  if(m){ var y=+m[1]; if(y<1911)y+=1911; date=y+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0'); }
+  else { m=text.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/); if(m) date=m[1]+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0'); }
+  var toks=text.split(/[\s ]+/).filter(Boolean);
+  var KINDS={'現買':'spot','現賣':'sell','普買':'spot','普賣':'sell','買進':'spot','賣出':'sell','零買':'spot','零賣':'sell','定買':'dca'};
+  var isNum=function(s){ return /^-?\d{1,3}(,\d{3})*(\.\d+)?$|^-?\d+(\.\d+)?$/.test(s); };
+  var rows=[];
+  for(var i=0;i<toks.length;i++){
+    var kind=KINDS[toks[i]]; if(!kind) continue;
+    var j=i+1, name='';
+    while(j<toks.length && !isNum(toks[j]) && !KINDS[toks[j]]){ name+=toks[j]; j++; }
+    var nums=[];
+    while(j<toks.length && !KINDS[toks[j]]){
+      if(isNum(toks[j])) nums.push(rawnum(toks[j]));
+      else if(nums.length) break;
+      j++;
+    }
+    i=j-1;
+    if(!name||nums.length<3) continue;
+    // 欄位：數量 [現沖] 成交價 價金 手續費 交易稅 …；用「價金≈數量×成交價」對位
+    var sh=nums[0], px=null, fee=0, tax=0;
+    var near=function(a,b){ return Math.abs(a-b)<=Math.max(2, a*0.005); };
+    if(nums.length>=4 && near(sh*nums[2], nums[3])){ px=nums[2]; fee=nums[4]||0; tax=nums[5]||0; }
+    else if(near(sh*nums[1], nums[2])){ px=nums[1]; fee=nums[3]||0; tax=nums[4]||0; }
+    if(!(sh>0)||!(px>0)) continue;
+    rows.push({kind:kind, name:name, code:slipCodeOf(name), sh:sh, px:px, fee:fee, tax:tax, date:date});
+  }
+  return rows;
+}
+function slipDup(r){
+  var code=r.code; if(!code) return false;
+  return (state.tx||[]).some(function(t){ return t.code===code && (t.date||'')===(r.date||'') && Number(t.sh)===r.sh && Number(t.px)===r.px && ((t.kind==='sell')===(r.kind==='sell')); });
+}
+var slipRows=[];
+function openSlip(){
+  slipRows=[];
+  document.getElementById('slipBox').value='';
+  document.getElementById('slipList').innerHTML='';
+  document.getElementById('slipImport').style.display='none';
+  document.getElementById('slipStatus').textContent='支援台新證券「成交資料」通知（現買／現賣）。手續費會直接帶入實際金額。';
+  document.getElementById('slipModal').classList.add('on'); document.body.style.overflow='hidden';
+}
+function closeSlip(){ document.getElementById('slipModal').classList.remove('on'); document.body.style.overflow=''; }
+function renderSlipList(){
+  var box=document.getElementById('slipList');
+  if(!slipRows.length){ box.innerHTML=''; document.getElementById('slipImport').style.display='none'; return; }
+  box.innerHTML=slipRows.map(function(r,i){
+    var dup=slipDup(r);
+    var codeCell = r.code
+      ? '<b>'+(meta(r.code).name||r.code)+'</b> <small>'+r.code+'</small>'
+      : '<select class="slipcode" data-i="'+i+'" style="max-width:150px"><option value="">選標的…</option>'+codeOptionsHTML(selectableCatalog())+'</select>';
+    return '<div class="pricerow2" style="align-items:center">'+
+      '<label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer">'+
+        '<input type="checkbox" class="slipck" data-i="'+i+'"'+((r.code&&!dup)?' checked':'')+' style="width:19px;height:19px;flex:none">'+
+        '<span><span class="kbadge '+(r.kind==='sell'?'sell':'spot')+'">'+(r.kind==='sell'?'賣出':'現買')+'</span> '+codeCell+
+        '<br><small class="num">'+fmt(r.sh)+' 股 × '+fmt2(r.px)+'　手續費 '+fmt(r.fee)+(r.tax?'　稅 '+fmt(r.tax):'')+'　'+(r.date||'')+(dup?'　<b style="color:#B3261E">已有相同記錄</b>':'')+'</small></span>'+
+      '</label></div>';
+  }).join('');
+  document.getElementById('slipImport').style.display='';
+  box.querySelectorAll('.slipcode').forEach(function(sel){ sel.onchange=function(){ slipRows[+sel.dataset.i].code=sel.value; renderSlipList(); }; });
+}
+document.getElementById('slipBtn').onclick=openSlip;
+document.getElementById('slipX').onclick=closeSlip;
+document.getElementById('slipCancel').onclick=closeSlip;
+(function(){ var m=document.getElementById('slipModal'); if(m) m.onclick=function(e){ if(e.target===m) closeSlip(); }; })();
+document.getElementById('slipParse').onclick=function(){
+  var t=document.getElementById('slipBox').value, st=document.getElementById('slipStatus');
+  if(!t.trim()){ st.textContent='先把成交通知的內容貼進上面的框。'; return; }
+  slipRows=parseSlip(t);
+  if(!slipRows.length){ st.textContent='沒有解析到交易——確認貼的是含「現買／現賣＋數量＋成交價」的整封通知。'; renderSlipList(); return; }
+  var unk=slipRows.filter(function(r){return !r.code;}).length;
+  st.textContent='✓ 解析到 '+slipRows.length+' 筆'+(unk?('，其中 '+unk+' 筆請先選標的'):'')+'，勾選後按「匯入」。';
+  renderSlipList();
+};
+document.getElementById('slipImport').onclick=function(){
+  var n=0, skip=[];
+  document.querySelectorAll('#slipList .slipck').forEach(function(ck){
+    if(!ck.checked) return;
+    var r=slipRows[+ck.dataset.i];
+    if(!r||!r.code){ skip.push((r&&r.name)||'未選標的'); return; }
+    if(r.kind==='sell'){
+      var cur=holdings().find(function(h){return h.code===r.code;});
+      if(!cur||cur.sh<r.sh){ skip.push(r.name+'（持股不足）'); return; }
+    }
+    var info=meta(r.code);
+    var t={code:r.code, name:info.name, cat:info.cat, sh:r.sh, px:r.px, date:r.date||'', kind:r.kind==='dca'?'dca':(r.kind==='sell'?'sell':'spot'), fee:r.fee};
+    state.tx.push(t);
+    if(state.prices[r.code]==null) state.prices[r.code]=r.px;
+    n++;
+  });
+  if(n){ save(); render(); }
+  if(skip.length) alert('已匯入 '+n+' 筆。略過：'+skip.join('、'));
+  else if(n) alert('已匯入 '+n+' 筆交易 ✓');
+  if(n) closeSlip();
+};
+
+// ═══ 自動報價：讀 GitHub Actions 每日產出的 prices.json ═══
+function fetchAutoPrices(){
+  try{
+    fetch('prices.json?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
+      if(!j||!j.prices||!state) return;
+      var latest='', changed=false;
+      Object.keys(j.prices).forEach(function(code){
+        var e=j.prices[code]||{}, p=Number(e.p);
+        if(!(p>0)) return;
+        if(Number(state.prices[code])!==p){ state.prices[code]=p; changed=true; }
+        recordPrice(code,p);
+        if(e.d&&e.d>latest) latest=e.d;
+      });
+      if(!latest) return;
+      var prev=state.autoPx&&state.autoPx.d;
+      state.autoPx={at:j.updated||'', d:latest};
+      if(String(state.updated||'').replace(/\//g,'-')<latest) state.updated=latest.replace(/-/g,'/');
+      save();
+      if(changed||prev!==latest) render();
+    }).catch(function(){});
+  }catch(e){}
+}
 load(); render();
+fetchAutoPrices();
+document.addEventListener('visibilitychange',function(){ if(!document.hidden) fetchAutoPrices(); });
 </script>
 <script>
 if ('serviceWorker' in navigator) {

@@ -1,4 +1,4 @@
-const CACHE = 'invest-v90';
+const CACHE = 'invest-v91';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-180.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
@@ -11,6 +11,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = e.request.url;
+  if (url.includes('prices.json')) return; // 自動報價永遠走網路，不吃快取（離線時 app 自己略過）
   const isHTML = e.request.mode === 'navigate' || url.endsWith('/') || url.endsWith('index.html');
   if (isHTML) {
     // 主頁面：快取優先即時開啟（秒開），同時背景抓最新版更新快取（stale-while-revalidate）

@@ -1,0 +1,38 @@
+name: Update prices
+
+on:
+  schedule:
+    # UTC 時間。台北 = UTC+8
+    - cron: '10 6 * * 1-5'   # 台北 14:10 一～五：台股收盤價
+    - cron: '0 11 * * 1-5'   # 台北 19:00 一～五：基金淨值
+    - cron: '15 23 * * 1-5'  # 台北 07:15 二～六：美股收盤(VOO)
+  workflow_dispatch:         # 手動也可以跑
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-prices
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Fetch prices
+        run: node scripts/fetch-prices.mjs
+      - name: Commit if changed
+        run: |
+          git config user.name "price-bot"
+          git config user.email "actions@github.com"
+          git add prices.json
+          if git diff --cached --quiet; then
+            echo "no change"
+          else
+            git commit -m "prices: $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push
+          fi
