@@ -681,6 +681,7 @@ nav button.on .ic{transform:translateY(-1px)}
 
   <!-- 總覽（原持倉） -->
   <section id="tab-hold" class="on">
+    <div id="autoDcaBanner"></div>
     <div id="dueBanner"></div>
     <div id="saleBanner"></div>
 
@@ -1687,6 +1688,7 @@ function render(){
   const rs=document.getElementById('realizedSum'); rs.textContent=(t.realized>=0?'+':'−')+fmt(Math.abs(Math.round(t.realized))); rs.className='v num '+plClass(t.realized);
   renderPlans();
   renderDue();
+  renderAutoDca();
   renderAdd();
   renderSale();
 }
@@ -2346,7 +2348,7 @@ function renderDue(){
     return;
   }
   el.innerHTML='<div class="card due"><div class="dueh">🔔 今天 '+dom+' 號是扣款日<button class="duex" id="dueX">✕</button></div>'+
-    '<div class="note" style="margin:0">扣款後記得手動記一筆：</div>'+
+    '<div class="note" style="margin:0">明天會以今天收盤價自動入帳；想先記也可以：</div>'+
     due.map(function(p){ var info=meta(p.code); var i=state.plans.indexOf(p); return '<div class="duerow"><span><b>'+(info.name||p.code)+'</b> · 每月 NT$ '+fmt(p.amount)+'</span><button class="duelog" data-i="'+i+'">記一筆</button></div>'; }).join('')+
     '</div>';
   document.getElementById('dueX').onclick=function(){ state.dueDismissed=todayStr; save(); render(); };
@@ -2513,11 +2515,17 @@ document.getElementById('slipParse').onclick=function(){
   renderSlipList();
 };
 document.getElementById('slipImport').onclick=function(){
-  var n=0, skip=[];
+  var n=0, fixed=0, skip=[];
   document.querySelectorAll('#slipList .slipck').forEach(function(ck){
     if(!ck.checked) return;
     var r=slipRows[+ck.dataset.i];
     if(!r||!r.code){ skip.push((r&&r.name)||'未選標的'); return; }
+    // 同檔、日期相近、金額相近的「自動入帳」→ 用憑單實價更正，不新增
+    if(r.kind!=='sell'){
+      var amt=r.sh*r.px;
+      var au=(state.tx||[]).find(function(x){ return x.auto && x.code===r.code && x.date && (!r.date||Math.abs(daysBetween(x.date,r.date))<=5) && Math.abs((Number(x.sh)||0)*(Number(x.px)||0)-amt)<=Math.max(500, amt*0.15); });
+      if(au){ au.sh=r.sh; au.px=r.px; au.fee=r.fee; if(r.date)au.date=r.date; delete au.auto; if(au.ref==='自動') delete au.ref; fixed++; n++; return; }
+    }
     if(r.kind==='sell'){
       var cur=holdings().find(function(h){return h.code===r.code;});
       if(!cur||cur.sh<r.sh){ skip.push(r.name+'（持股不足）'); return; }
@@ -2529,10 +2537,59 @@ document.getElementById('slipImport').onclick=function(){
     n++;
   });
   if(n){ save(); render(); }
-  if(skip.length) alert('已匯入 '+n+' 筆。略過：'+skip.join('、'));
-  else if(n) alert('已匯入 '+n+' 筆交易 ✓');
+  var msg='已匯入 '+n+' 筆交易 ✓'+(fixed?('，其中 '+fixed+' 筆更正了自動入帳的估價'):'');
+  if(skip.length) alert(msg+'。略過：'+skip.join('、'));
+  else if(n) alert(msg);
   if(n) closeSlip();
 };
+
+// ═══ 定期定額自動入帳：扣款日隔天，用該日收盤價／淨值自動記一筆 ═══
+function nextHistPx(code, fromDate){
+  var arr=(state.priceHist&&state.priceHist[code])||[];
+  for(var i=0;i<arr.length;i++){
+    if(arr[i].d>=fromDate){ return (daysBetween(fromDate, arr[i].d)<=7) ? arr[i] : null; }
+  }
+  return null;
+}
+function autoBookDca(){
+  if(!state) return 0;
+  if(!state.autoDcaFrom){ state.autoDcaFrom=dstr(0); save(); return 0; } // 第一次啟用：之後的扣款日才開始自動入帳
+  var today=dstr(0), booked=[];
+  (state.plans||[]).forEach(function(p){
+    if(!p.on||!(Number(p.amount)>0)) return;
+    var day=Number(p.day); if(!(day>=1&&day<=28)) return;
+    var t=new Date();
+    for(var k=1;k>=0;k--){ // 檢查上個月與本月的扣款日
+      var d=new Date(t.getFullYear(), t.getMonth()-k, day);
+      var ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      if(ds>=today) continue;               // 今天／未來：等收盤出來隔天再記
+      if(ds<state.autoDcaFrom) continue;    // 啟用前的舊扣款日不補
+      if(p.start&&ds<p.start) continue;
+      var hit=nextHistPx(p.code, ds); if(!hit) continue; // 該日(或順延)收盤還沒有
+      if(hit.d>=today) continue;            // 執行日尚未收盤完畢
+      var dup=(state.tx||[]).some(function(x){ return x.code===p.code && x.kind==='dca' && x.date && Math.abs(daysBetween(hit.d, x.date))<=5; });
+      if(dup) continue;                     // 已手動記過或已自動入帳
+      var px=hit.p, sh=Math.round(Number(p.amount)/px*10000)/10000;
+      var info=meta(p.code);
+      var tx={code:p.code,name:info.name,cat:info.cat,sh:sh,px:px,date:hit.d,kind:'dca',auto:true};
+      if(isFund(p.code)){ tx.fund=true; tx.ref=p.ref||'自動'; } else tx.ref='自動';
+      state.tx.push(tx);
+      if(state.prices[p.code]==null) state.prices[p.code]=px;
+      booked.push((info.name||p.code)+'　'+mmdd(hit.d)+' · NT$ '+fmt(p.amount)+' ≈ '+sh.toFixed(2)+(isFund(p.code)?' 單位':' 股')+' @ '+fmt2(px));
+    }
+  });
+  if(booked.length){ state.autoDcaNotice={at:today, items:booked}; save(); }
+  return booked.length;
+}
+function renderAutoDca(){
+  var el=document.getElementById('autoDcaBanner'); if(!el) return;
+  var n=state.autoDcaNotice;
+  if(!n||!n.items||!n.items.length||state.autoDcaNoticeX===n.at){ el.innerHTML=''; return; }
+  el.innerHTML='<div class="card due"><div class="dueh">✅ 定期定額已自動入帳<button class="duex" id="autoDcaX">✕</button></div>'+
+    n.items.map(function(s){ return '<div class="note num" style="margin:4px 0 0">'+s+'</div>'; }).join('')+
+    '<p class="note" style="margin:7px 0 0;color:var(--muted)">以扣款日收盤價估算；之後貼交割憑單會自動更正成實際成交價與手續費。</p></div>';
+  var x=document.getElementById('autoDcaX'); if(x) x.onclick=function(){ state.autoDcaNoticeX=n.at; save(); renderAutoDca(); };
+}
 
 // ═══ 自動報價：讀 GitHub Actions 每日產出的 prices.json ═══
 function fetchAutoPrices(){
@@ -2566,12 +2623,13 @@ function fetchAutoPrices(){
       var prev=state.autoPx&&state.autoPx.d;
       state.autoPx={at:j.updated||'', d:latest};
       if(String(state.updated||'').replace(/\//g,'-')<latest) state.updated=latest.replace(/-/g,'/');
+      var nb=autoBookDca();
       save();
-      if(changed||prev!==latest) render();
+      if(changed||prev!==latest||nb) render();
     }).catch(function(){});
   }catch(e){}
 }
-load(); render();
+load(); autoBookDca(); render();
 fetchAutoPrices();
 document.addEventListener('visibilitychange',function(){ if(!document.hidden) fetchAutoPrices(); });
 </script>
