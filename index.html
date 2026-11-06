@@ -955,7 +955,7 @@ nav button.on .ic{transform:translateY(-1px)}
         <p class="note" style="margin:8px 0 0">依你記錄的持倉、現金與計畫自動判斷，為 MJ老師公開教學心法的整理與自我對照，非投資建議。</p>
       </div>
     </div>
-    <p class="note" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v97</p>
+    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v98</p>
   </section>
 
   <!-- 交割 -->
@@ -2767,14 +2767,44 @@ function fetchAutoPrices(){
 load(); autoBookDca(); render();
 fetchAutoPrices();
 document.addEventListener('visibilitychange',function(){ if(!document.hidden) fetchAutoPrices(); });
-// iOS：鍵盤收起或工具列伸縮後，可視視窗有時卡在縮小狀態 → 把視窗捲回原點強制校正
+// iOS：鍵盤收起或工具列伸縮後，版面視窗有時卡在縮小狀態（頁面比螢幕短一截、nav 下露縫）
+// → 以 visualViewport（真實可視高度）為準，直接把 body 撐到正確高度
+function fixViewportHeight(){
+  if(!window.visualViewport) return;
+  var vh=Math.round(window.visualViewport.height);
+  if(vh > window.innerHeight+1){ document.body.style.height=vh+'px'; }
+  else { document.body.style.height=''; }
+  window.scrollTo(0,0); document.documentElement.scrollTop=0;
+}
 if(window.visualViewport){
   var vvT=null;
-  window.visualViewport.addEventListener('resize', function(){
-    clearTimeout(vvT);
-    vvT=setTimeout(function(){ window.scrollTo(0,0); document.documentElement.scrollTop=0; }, 120);
-  });
+  window.visualViewport.addEventListener('resize', function(){ clearTimeout(vvT); vvT=setTimeout(fixViewportHeight, 120); });
+  window.addEventListener('focusout', function(){ setTimeout(fixViewportHeight, 250); });
+  setTimeout(fixViewportHeight, 300);
 }
+// 版本字樣連點三下：顯示版面診斷數據（除錯用）
+(function(){
+  var v=document.getElementById('verTag'); if(!v) return;
+  var n=0, t=null;
+  v.addEventListener('click', function(){
+    n++; clearTimeout(t); t=setTimeout(function(){ n=0; }, 900);
+    if(n<3) return;
+    n=0;
+    var probe=document.createElement('div');
+    probe.style.cssText='position:fixed;bottom:0;left:0;height:env(safe-area-inset-bottom);width:1px;visibility:hidden';
+    document.body.appendChild(probe);
+    var sab=Math.round(probe.getBoundingClientRect().height); probe.remove();
+    var b=document.body.getBoundingClientRect(), nv=document.querySelector('nav').getBoundingClientRect();
+    alert('版面診斷\nscreen：'+screen.width+'×'+screen.height+
+      '\ninner：'+window.innerWidth+'×'+window.innerHeight+
+      '\nvisual：'+(window.visualViewport?Math.round(visualViewport.width)+'×'+Math.round(visualViewport.height)+'（offsetTop '+Math.round(visualViewport.offsetTop)+'）':'不支援')+
+      '\nbody 高：'+Math.round(b.height)+'（底 '+Math.round(b.bottom)+'）'+
+      '\nnav 底：'+Math.round(nv.bottom)+
+      '\n安全區底：'+sab+
+      '\nscrollY：'+Math.round(window.scrollY)+
+      '\n站立模式：'+(window.navigator.standalone?'是':'否'));
+  });
+})();
 </script>
 <script>
 if ('serviceWorker' in navigator) {
