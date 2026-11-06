@@ -952,7 +952,7 @@ nav button.on .ic{transform:translateY(-1px)}
         <p class="note" style="margin:8px 0 0">依你記錄的持倉、現金與計畫自動判斷，為 MJ老師公開教學心法的整理與自我對照，非投資建議。</p>
       </div>
     </div>
-    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v103</p>
+    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v104</p>
   </section>
 
   <!-- 交割 -->
@@ -2613,13 +2613,29 @@ document.getElementById('slipParse').onclick=function(){
 };
 // 截圖 OCR：上傳成交通知截圖，辨識文字後走同一套解析
 document.getElementById('slipPhoto').onclick=function(){ document.getElementById('slipFile').click(); };
+// 先把照片畫到 canvas：解掉 iPhone 的 HEIC 格式、縮到適中尺寸（省記憶體、加速辨識）
+function slipImageToCanvas(f){
+  return new Promise(function(res, rej){
+    var url=URL.createObjectURL(f), img=new Image();
+    img.onload=function(){
+      var MAX=1600, sc=Math.min(1, MAX/Math.max(img.naturalWidth, img.naturalHeight));
+      var cv=document.createElement('canvas');
+      cv.width=Math.round(img.naturalWidth*sc); cv.height=Math.round(img.naturalHeight*sc);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url); res(cv);
+    };
+    img.onerror=function(){ URL.revokeObjectURL(url); rej(new Error('無法讀取這張圖片')); };
+    img.src=url;
+  });
+}
 document.getElementById('slipFile').onchange=function(e){
   var f=e.target.files&&e.target.files[0]; e.target.value=''; if(!f) return;
   var st=document.getElementById('slipStatus');
   var run=function(){
     st.textContent='🔍 辨識截圖中…（第一次使用會下載中文辨識模型，約 10～30 秒，請稍候）';
-    Tesseract.createWorker(['chi_tra','eng']).then(function(worker){
-      return worker.recognize(f).then(function(out){ worker.terminate(); return out; });
+    Promise.all([slipImageToCanvas(f), Tesseract.createWorker('chi_tra')]).then(function(r){
+      var cv=r[0], worker=r[1];
+      return worker.recognize(cv).then(function(out){ worker.terminate(); return out; });
     }).then(function(out){
       var txt=(out&&out.data&&out.data.text)||'';
       document.getElementById('slipBox').value=txt;
@@ -2629,7 +2645,7 @@ document.getElementById('slipFile').onchange=function(e){
       st.textContent='✓ 截圖辨識＋解析到 '+slipRows.length+' 筆'+(unk?('，其中 '+unk+' 筆請先選標的'):'')+'。數字可能有辨識誤差，匯入前請核對。';
       renderSlipList();
     }).catch(function(err){
-      st.textContent='截圖辨識失敗（'+((err&&err.message)||err)+'）。備案：長按截圖用「選取文字」全選拷貝，貼進上面的框再解析。';
+      st.textContent='截圖辨識失敗（'+((err&&err.message)||err)+'）。可換個方式：打開截圖 → 長按選取文字 → 全選拷貝，貼進上面的框按「解析 ↓」一樣能自動入帳。';
     });
   };
   if(window.Tesseract){ run(); return; }

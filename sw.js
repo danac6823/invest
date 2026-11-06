@@ -1,4 +1,4 @@
-const CACHE = 'invest-v103'; // 升版時同步改 index.html 頁尾的「豐盛之路 vXX」
+const CACHE = 'invest-v104'; // 升版時同步改 index.html 頁尾的「豐盛之路 vXX」
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-180.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
@@ -12,6 +12,7 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = e.request.url;
   if (url.includes('prices.json')) return; // 自動報價永遠走網路，不吃快取（離線時 app 自己略過）
+  if (!url.startsWith(self.location.origin)) return; // 跨網域（辨識引擎/模型等 CDN）不攔截，避免壞掉的快取回應
   const isHTML = e.request.mode === 'navigate' || url.endsWith('/') || url.endsWith('index.html');
   if (isHTML) {
     // 主頁面：快取優先即時開啟（秒開），同時背景抓最新版更新快取（stale-while-revalidate）
