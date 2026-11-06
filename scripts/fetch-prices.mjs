@@ -36,7 +36,12 @@ async function getJson(url) {
 
 // 讀上一次的結果當底，抓不到的代號保留舊值
 let prices = {};
-try { prices = JSON.parse(readFileSync(OUT, 'utf8')).prices || {}; } catch {}
+let prevJson = '';
+try {
+  prevJson = readFileSync(OUT, 'utf8');
+  prices = JSON.parse(prevJson).prices || {};
+} catch {}
+const before = JSON.stringify(prices);
 
 const errors = [];
 const setPx = (code, p, d, src, extra) => {
@@ -98,11 +103,15 @@ for (const [code, cnyesId] of Object.entries(FUNDS)) {
   } catch (e) { errors.push(`fund ${code}: ` + e.message); }
 }
 
-// ── 輸出 ────────────────────────────────────────────
-const out = {
-  updated: new Date().toISOString(),
-  errors: errors.length ? errors : undefined,
-  prices,
-};
-writeFileSync(OUT, JSON.stringify(out, null, 1) + '\n');
-console.log(`OK ${Object.keys(prices).length} codes`, errors.length ? `(errors: ${errors.join('; ')})` : '');
+// ── 輸出（價格沒變就不動檔案，避免無意義的 commit）───
+if (JSON.stringify(prices) === before && prevJson) {
+  console.log('no price change, skip write', errors.length ? `(errors: ${errors.join('; ')})` : '');
+} else {
+  const out = {
+    updated: new Date().toISOString(),
+    errors: errors.length ? errors : undefined,
+    prices,
+  };
+  writeFileSync(OUT, JSON.stringify(out, null, 1) + '\n');
+  console.log(`OK ${Object.keys(prices).length} codes`, errors.length ? `(errors: ${errors.join('; ')})` : '');
+}
