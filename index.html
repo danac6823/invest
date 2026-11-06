@@ -975,7 +975,7 @@ nav button.on .ic{transform:translateY(-1px)}
         <p class="note" style="margin:8px 0 0">依你記錄的持倉、現金與計畫自動判斷，為 MJ老師公開教學心法的整理與自我對照，非投資建議。</p>
       </div>
     </div>
-    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v116</p>
+    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v117</p>
   </section>
 
   <!-- 交割 -->
@@ -1463,6 +1463,22 @@ function renderAssist(){
 
 // ── 股利提醒：除息日前持有股數 × 每股息，一鍵記入帳 ──
 function shAt(code,d){ var s=0; (state.tx||[]).forEach(function(t){ if(t.code!==code||!t.date||!(t.date<d))return; var sh=Number(t.sh)||0; s+=(t.kind==='sell'?-sh:sh); }); return Math.round(s*10000)/10000; }
+function holdAt(code,endD,excl){ // 依時間重播交易：截至 endD 的持股與含費均價（excl=true 不含 endD 當天；無日期的交易一律計入）
+  var sh=0, cost=0;
+  state.tx.map(function(t,i){return {t:t,i:i};}).sort(function(a,b){
+    var ad=a.t.date, bd=b.t.date;
+    if(ad&&bd) return ad<bd?-1:(ad>bd?1:a.i-b.i);
+    if(ad&&!bd) return -1; if(!ad&&bd) return 1; return a.i-b.i;
+  }).forEach(function(o){
+    var t=o.t; if(t.code!==code) return;
+    if(t.date && (excl ? !(t.date<endD) : !(t.date<=endD))) return;
+    var s=Number(t.sh)||0; if(!s) return;
+    var px=Number(t.px)||0, fee=txFee(t);
+    if(t.kind==='sell'){ var ss=Math.min(s,sh), av=sh?cost/sh:0; cost-=ss*av; sh-=ss; }
+    else { sh+=s; cost+=s*px+fee; }
+  });
+  return {sh:Math.round(sh*10000)/10000, avg:sh?cost/sh:0};
+}
 function renderDivNotice(){
   var el=document.getElementById('divNotice'); if(!el) return;
   var divs=state.divs||{}, today=dstr(0), from=dstr(-45), to=dstr(30), bk=state.divBook||{}, mc=mergedCatalog();
@@ -2658,7 +2674,8 @@ function openDayChange(){
     if(pLast!=null&&pPrev!=null) pnl=(shPrev-dS)*(pLast-pPrev)+buyPnl+sellPnl;
     else if(pLast!=null&&(dB||dS)) pnl=buyPnl+sellPnl;
     if(pnl!=null) tot+=pnl;
-    items.push({code:code,nm:nm,pLast:pLast,pPrev:pPrev,dB:dB,dS:dS,kinds:kinds,pnl:pnl});
+    var aPrev=holdAt(code,lastD,true), aNow=holdAt(code,lastD,false);
+    items.push({code:code,nm:nm,pLast:pLast,pPrev:pPrev,dB:dB,dS:dS,kinds:kinds,pnl:pnl,avgPrev:aPrev.avg,avgNow:aNow.avg});
   });
   items.sort(function(x,y){ return Math.abs(y.pnl||0)-Math.abs(x.pnl||0); });
   var isToday=lastD===dstr(0);
@@ -2669,16 +2686,31 @@ function openDayChange(){
     var shTxt=(it.dB||it.dS)?('股數 '+(dsh>=0?'+':'−')+shStr(it.code,Math.abs(dsh))+'（'+it.kinds.join('/')+'）'):'持股不變';
     var pnlTxt=it.pnl==null?'—':((it.pnl>=0?'+':'−')+fmt(Math.abs(Math.round(it.pnl))));
     var cls=it.pnl==null?'zero':(it.pnl>0?'pos':(it.pnl<0?'neg':'zero'));
+    var avgLine='', avgTail='';
+    if(it.dB||it.dS){
+      if(it.avgPrev>0||it.avgNow>0){
+        var right=it.avgNow>0?fmt2(it.avgNow):'出清', tag='';
+        if(it.avgPrev>0&&it.avgNow>0){
+          var dd=it.avgNow-it.avgPrev;
+          if(Math.abs(dd)>=0.005){ var dn=dd<0; tag='　<b style="color:var(--'+(dn?'down':'up')+')">'+(dn?'▼攤平':'▲墊高')+' '+(Math.abs(dd)/it.avgPrev*100).toFixed(1)+'%</b>'; }
+          else tag='　<small>不變</small>';
+        } else if(!(it.avgPrev>0)) tag='　<small>新倉</small>';
+        avgLine='<div class="num" style="font-size:12.5px;color:var(--muted);margin-top:2px">含費均價 '+(it.avgPrev>0?fmt2(it.avgPrev):'—')+' → '+right+tag+'</div>';
+      }
+    } else if(it.avgNow>0){
+      avgTail='　·　均價 '+fmt2(it.avgNow);
+    }
     return '<div style="padding:10px 0;border-bottom:1px solid var(--line)">'+
       '<div style="display:flex;justify-content:space-between;gap:8px"><span><b>'+it.nm+'</b> <small style="color:var(--muted)">'+it.code+'</small></span><span class="num '+cls+'" style="font-weight:700">'+pnlTxt+'</span></div>'+
-      '<div class="num" style="font-size:12.5px;color:var(--muted);margin-top:2px">'+priceTxt+'　·　'+shTxt+'</div>'+
+      '<div class="num" style="font-size:12.5px;color:var(--muted);margin-top:2px">'+priceTxt+'　·　'+shTxt+avgTail+'</div>'+
+      avgLine+
     '</div>';
   }).join('');
   document.getElementById('lbSheet').innerHTML=
     '<div class="lbtop"><div class="lbnm">'+(isToday?'今日變化':mmdd(lastD)+' 變化')+'<small>'+lastD+' 收盤 vs 前一交易日</small></div><button class="lbclose" id="lbX">✕</button></div>'+
     rowsH+
     '<div class="num" style="display:flex;justify-content:space-between;padding:12px 0 2px;font-weight:700"><span>合計</span><span class="'+(tot>0?'pos':(tot<0?'neg':'zero'))+'">'+(tot>=0?'+':'−')+fmt(Math.abs(Math.round(tot)))+'</span></div>'+
-    '<p class="note" style="margin-top:8px">當日損益＝原持股 × 當日價差'+(anyTx?' ＋ 當天買進 ×（收盤 − 成交價）＋ 當天賣出 ×（成交價 − 昨收）':'')+'，未計手續費與稅。'+(anyTx?'':'當天沒有買賣。')+'</p>';
+    '<p class="note" style="margin-top:8px">當日損益＝原持股 × 當日價差'+(anyTx?' ＋ 當天買進 ×（收盤 − 成交價）＋ 當天賣出 ×（成交價 − 昨收）':'')+'，未計手續費與稅。'+(anyTx?'均價＝含手續費的成本均價：買進會變（攤平/墊高），賣出不變。':'當天沒有買賣。')+'</p>';
   var lb=document.getElementById('lightbox'); lb.classList.add('on'); document.body.style.overflow='hidden';
   document.getElementById('lbX').onclick=closeLightbox;
   lb.onclick=function(e){ if(e.target===lb) closeLightbox(); };
