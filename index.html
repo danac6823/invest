@@ -152,7 +152,14 @@ input.px:focus{outline:2px solid var(--ink2); outline-offset:1px; border-color:v
 .cashrow .ct.buy,.cashrow .ct.dca{background:rgba(110,120,135,.12); color:var(--muted)}
 .cashrow .ct.sell{background:rgba(45,130,90,.14); color:#1f7a52}
 .cashrow .cd{color:var(--muted); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.cashrow .ca{margin-left:auto; font-weight:600; flex:none}
+.cashrow .cout,.cashrow .cin{flex:none; width:74px; text-align:right; font-weight:600; font-variant-numeric:tabular-nums}
+.cashrow .cout:first-of-type{margin-left:auto}
+.cashrow .cin{color:#1f7a52}
+.cashrow .cx{flex:none; width:22px; display:flex; justify-content:flex-end}
+.cashcols{display:flex; align-items:center; gap:9px}
+.cashcols .chl{flex:1}
+.cashcols .chc{flex:none; width:74px; text-align:right}
+.cashcols .chx{flex:none; width:22px}
 .cashbig{font-size:30px; font-weight:700; color:var(--ink); line-height:1.05; font-variant-numeric:tabular-nums}
 .cashbig .cur{font-size:16px; font-weight:500; color:var(--muted)}
 .resbar{height:10px; background:var(--paper); border-radius:6px; overflow:hidden; margin:12px 0 8px}
@@ -533,7 +540,7 @@ nav button.on .ic{transform:translateY(-1px)}
     <div class="tiles4">
       <button class="tile4" data-go="hold"><span class="tk4">總市值 · 點看總覽<span class="ic4">›</span></span><span class="tv4 num" id="tHoldVal">—</span><span class="tsub4 num delta" id="tHoldPnl"></span></button>
       <button class="tile4" data-go="tx"><span class="tk4">本月投入<span class="ic4">›</span></span><span class="tv4 num" id="tMoUse">—</span><span class="tsub4 num" id="tMoPlan"></span></button>
-      <button class="tile4" data-go="home:cashCard"><span class="tk4">交割戶餘額<span class="ic4">›</span></span><span class="tv4 num" id="tCash">—</span><span class="tsub4">買賣自動扣入</span></button>
+      <button class="tile4" data-go="cash:cashCard"><span class="tk4">交割戶餘額<span class="ic4">›</span></span><span class="tv4 num" id="tCash">—</span><span class="tsub4">買賣自動扣入</span></button>
       <button class="tile4" data-go="alloc:resCard"><span class="tk4">預備金剩餘<span class="ic4">›</span></span><span class="tv4 num" id="tRes">—</span><span class="tsub4">逢深跌的子彈</span></button>
     </div>
 
@@ -560,6 +567,17 @@ nav button.on .ic{transform:translateY(-1px)}
       <div class="relaxmsg" id="relaxMsg"></div>
     </div>
 
+    <div class="homesec">📎 參考指標</div>
+    <div class="card">
+      <p class="eyebrow">參考指標 · 非追蹤目標</p>
+      <div class="kv"><span class="k">台積電穿透曝險</span><span class="v num" id="ltTsmc">—</span></div>
+      <div class="kv"><span class="k">半導體穿透曝險</span><span class="v num" id="ltSemi">—</span></div>
+      <details class="hint"><summary>什麼是穿透</summary><p class="note">穿透＝把 0050／006208 及基金裡的成分還原後，實際壓在台積電／半導體的比重。基金依各自成分權重計入（可在設定 ⚙ 調整）。</p></details>
+    </div>
+  </section>
+
+  <!-- 帳戶 -->
+  <section id="tab-cash">
     <div class="homesec">🏦 交割帳戶</div>
     <div class="card" id="cashCard">
       <p class="eyebrow" style="margin:0 0 6px">交割帳戶餘額</p>
@@ -581,16 +599,8 @@ nav button.on .ic{transform:translateY(-1px)}
       <div class="kv" style="margin-top:12px"><span class="k">預備金剩餘</span><span class="v num" id="cashRes">—</span></div>
       <div class="kv"><span class="k">可用資金合計</span><span class="v num" id="cashTotal">—</span></div>
       <details class="hint"><summary>怎麼用</summary><p class="note">買進／定期定額會自動扣出、賣出自動入帳；這裡只記入金、股利、出金。餘額滾動計算，可跟券商對帳。第一次用先記一筆「入金」＝你的本金。</p></details>
-      <div class="cashledger-h">明細</div>
+      <div class="cashledger-h cashcols"><span class="chl">明細</span><span class="chc">出</span><span class="chc">入</span><span class="chx"></span></div>
       <div id="cashList"></div>
-    </div>
-
-    <div class="homesec">📎 參考指標</div>
-    <div class="card">
-      <p class="eyebrow">參考指標 · 非追蹤目標</p>
-      <div class="kv"><span class="k">台積電穿透曝險</span><span class="v num" id="ltTsmc">—</span></div>
-      <div class="kv"><span class="k">半導體穿透曝險</span><span class="v num" id="ltSemi">—</span></div>
-      <details class="hint"><summary>什麼是穿透</summary><p class="note">穿透＝把 0050／006208 及基金裡的成分還原後，實際壓在台積電／半導體的比重。基金依各自成分權重計入（可在設定 ⚙ 調整）。</p></details>
     </div>
   </section>
 
@@ -748,8 +758,9 @@ nav button.on .ic{transform:translateY(-1px)}
     </div>
   </section>
 
-  <!-- 配置 -->
+  <!-- 配置（併入「更多」顯示） -->
   <section id="tab-alloc">
+    <div class="homesec">◐ 配置調整</div>
     <div class="card emptystate" id="allocEmpty" style="display:none">
       <div class="esic">⚖️</div>
       <div class="estitle">配置頁還沒東西可調</div>
@@ -954,7 +965,7 @@ nav button.on .ic{transform:translateY(-1px)}
         <p class="note" style="margin:8px 0 0">依你記錄的持倉、現金與計畫自動判斷，為 MJ老師公開教學心法的整理與自我對照，非投資建議。</p>
       </div>
     </div>
-    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v107</p>
+    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v108</p>
   </section>
 
   <!-- 交割 -->
@@ -963,7 +974,7 @@ nav button.on .ic{transform:translateY(-1px)}
 <nav>
   <button data-tab="hold" class="on"><span class="ic">◎</span>總覽</button>
   <button data-tab="tx"><span class="ic">＋</span>記錄</button>
-  <button data-tab="alloc"><span class="ic">◐</span>配置</button>
+  <button data-tab="cash"><span class="ic">＄</span>帳戶</button>
   <button data-tab="home"><span class="ic">⋯</span>更多</button>
 </nav>
 
@@ -2139,7 +2150,7 @@ function renderCash(){
   if(!list.length){ el.innerHTML='<p class="note" style="margin:0">還沒有現金紀錄。先記一筆「入金」當本金。</p>'; return; }
   var LIMIT=10, more=list.length>LIMIT;
   var show=(cashExpanded||!more)?list:list.slice(0,LIMIT);
-  el.innerHTML=show.map(function(o){ var c=o.c, neg=(c.type==='withdraw'||c.type==='buy'||c.type==='dca'), sign=neg?'−':'+'; return '<div class="cashrow"><span class="ct '+c.type+'">'+TY[c.type]+'</span><span class="cd">'+(c.date||'—')+(c.note?' · '+c.note:'')+'</span><span class="ca num">'+sign+fmt(Math.round(Number(c.amount)||0))+'</span>'+(o.auto?'':'<button class="del" data-i="'+o.i+'">✕</button>')+'</div>'; }).join('')
+  el.innerHTML=show.map(function(o){ var c=o.c, neg=(c.type==='withdraw'||c.type==='buy'||c.type==='dca'), v=fmt(Math.round(Number(c.amount)||0)), ds=(c.date||'').replace(/^\d{4}-(\d{2})-(\d{2}).*/,'$1/$2'); return '<div class="cashrow"><span class="ct '+c.type+'">'+TY[c.type]+'</span><span class="cd">'+(ds||'—')+(c.note?' '+c.note:'')+'</span><span class="cout num">'+(neg?v:'')+'</span><span class="cin num">'+(neg?'':v)+'</span><span class="cx">'+(o.auto?'':'<button class="del" data-i="'+o.i+'">✕</button>')+'</span></div>'; }).join('')
     + (more?'<button class="cashmore" id="cashMore">'+(cashExpanded?'收合明細':'顯示全部 '+list.length+' 筆')+'</button>':'');
   el.querySelectorAll('.del').forEach(function(b){ b.onclick=function(){ if(confirm('刪除這筆？')){ state.cashTx.splice(+b.dataset.i,1); save(); render(); } }; });
   var mb=document.getElementById('cashMore'); if(mb) mb.onclick=function(){ cashExpanded=!cashExpanded; renderCash(); };
@@ -2485,12 +2496,12 @@ document.getElementById('impFile').onchange=e=>{ const f=e.target.files[0]; if(!
 // tabs
 function mainScrollTop(){ window.scrollTo(0,0); }
 function switchTab(name){
-  if(name==='cash'||name==='learn') name='home'; // 交割/學習已併入「更多」
-  var show = name==='home' ? ['tab-home','tab-learn'] : ['tab-'+name];
+  if(name==='alloc'||name==='learn') name='home'; // 配置/學習已併入「更多」
+  var show = name==='home' ? ['tab-home','tab-alloc','tab-learn'] : ['tab-'+name];
   document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',show.indexOf(s.id)>=0));
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===name));
   mainScrollTop();
-  if(name==='alloc'){ var al=document.getElementById('addList'); if(al&&typeof fitRows==='function') fitRows(al); }
+  if(show.indexOf('tab-alloc')>=0){ var al=document.getElementById('addList'); if(al&&typeof fitRows==='function') fitRows(al); }
 }
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
 
