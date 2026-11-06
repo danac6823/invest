@@ -704,7 +704,7 @@ nav button.on .ic{transform:translateY(-1px)}
     <div class="card hero">
       <p class="eyebrow">目前總市值</p>
       <div class="total num"><span class="cur">NT$</span><span id="hTotal">—</span></div>
-      <div class="delta"><span id="hDelta" class="num">—</span><span id="hChip" class="chip num">—</span></div>
+      <div class="delta"><span id="hDelta" class="num">—</span><span id="hChip" class="chip num">—</span><span id="hDay" class="chip num" style="display:none">—</span></div>
       <div id="hXirr" class="num" style="color:#CBBD93;font-size:13px;margin-top:5px">—</div>
       <div id="hUpd" style="color:#B3A67F;font-size:11.5px;margin-top:3px"></div>
       <div class="ruler"></div>
@@ -724,6 +724,7 @@ nav button.on .ic{transform:translateY(-1px)}
         <div class="mobar" style="margin:9px 0 8px"><div class="mobarfill" id="moBudgetFill"></div></div>
         <div class="pgbot"><span>本月投入 <b class="num" id="moTotal">—</b></span><span>每月計畫 <b class="num" id="moPlan">—</b> <span class="ic4">›</span></span></div>
       </div>
+      <div id="moChart"></div>
       <details class="hint" style="margin-top:11px"><summary>看本月明細</summary>
         <div class="moflow" style="margin-top:8px">
           <div class="mor"><span class="mok">定期定額</span><span class="mov num" id="moDca">—</span></div>
@@ -1209,22 +1210,82 @@ function snapshotVal(t){
   if(last&&last.d===d){ if(last.v!==v||last.c!==c){ last.v=v; last.c=c; save(); } }
   else { arr.push({d:d,v:v,c:c}); if(arr.length>730) arr.splice(0,arr.length-730); save(); }
 }
+function dailyValueSeries(){
+  // 用每日收盤歷史 × 交易紀錄，重建近 130 天每天的市值與投入成本
+  var ph=state.priceHist||{};
+  var codes=Object.keys(ph).filter(function(c){ return ph[c]&&ph[c].length; });
+  if(!codes.length) return null;
+  var dateSet={};
+  codes.forEach(function(c){ ph[c].forEach(function(x){ dateSet[x.d]=1; }); });
+  var ds=Object.keys(dateSet).sort();
+  if(ds.length<5) return null;
+  var txs=(state.tx||[]).filter(function(t){ return t.code&&Number(t.sh)>0; }).slice()
+    .sort(function(a,b){ var ad=a.date||'0000-00-00', bd=b.date||'0000-00-00'; return ad<bd?-1:(ad>bd?1:0); });
+  if(!txs.length) return null;
+  var ti=0, sh={}, cost={}, idx={}, lastPx={};
+  function applyTx(t){
+    var c=t.code, q=Number(t.sh)||0, px=Number(t.px)||0, fee=txFee(t);
+    sh[c]=sh[c]||0; cost[c]=cost[c]||0;
+    if(t.kind==='sell'){ var s2=Math.min(q,sh[c]), avg=sh[c]?cost[c]/sh[c]:0; cost[c]-=s2*avg; sh[c]-=s2; }
+    else { sh[c]+=q; cost[c]+=q*px+fee; }
+  }
+  var out=[];
+  ds.forEach(function(d){
+    while(ti<txs.length && (txs[ti].date||'0000-00-00')<=d){ applyTx(txs[ti]); ti++; }
+    codes.forEach(function(c){ var arr=ph[c]; idx[c]=idx[c]||0; while(idx[c]<arr.length && arr[idx[c]].d<=d){ lastPx[c]=arr[idx[c]].p; idx[c]++; } });
+    var v=0, cst=0, has=false;
+    Object.keys(sh).forEach(function(c){
+      if(!(sh[c]>0)) return; has=true;
+      var p=lastPx[c]||Number(state.prices[c])||0;
+      v+=sh[c]*p; cst+=cost[c];
+    });
+    if(has&&v>0) out.push({d:d, v:Math.round(v), c:Math.round(cst)});
+  });
+  return out.length>=2?out:null;
+}
 function renderValChart(){
   var el=document.getElementById('valChart'); if(!el) return;
-  var arr=state.valHist||[];
-  if(arr.length<2){ el.innerHTML='<p class="note" style="margin:0">走勢累積中——每次打開 App 或更新報價會自動記一點，隔天起開始畫線。</p>'; return; }
+  var arr=dailyValueSeries(), daily=!!arr;
+  if(!arr||arr.length<2){ arr=state.valHist||[]; }
+  if(arr.length<2){ el.innerHTML='<p class="note" style="margin:0">走勢累積中——有交易與自動報價後，這裡會畫出每天的市值曲線。</p>'; return; }
   var W=330,H=130,P=8;
   var all=[]; arr.forEach(function(x){ all.push(x.v,x.c); });
   var mn=Math.min.apply(null,all), mx=Math.max.apply(null,all); if(mx<=mn) mx=mn+1;
+  var pad=(mx-mn)*0.06; mn-=pad; mx+=pad;
   var X=function(i){return P+(W-2*P)*i/(arr.length-1);}, Y=function(v){return P+(H-2*P)*(1-(v-mn)/(mx-mn));};
   var pv=arr.map(function(x,i){return X(i).toFixed(1)+','+Y(x.v).toFixed(1);}).join(' ');
   var pc=arr.map(function(x,i){return X(i).toFixed(1)+','+Y(x.c).toFixed(1);}).join(' ');
-  var last=arr[arr.length-1];
+  var last=arr[arr.length-1], gain=last.v>=last.c;
+  var area=pv+' '+X(arr.length-1).toFixed(1)+','+(H-P)+' '+X(0).toFixed(1)+','+(H-P);
   el.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%; height:130px; display:block">'+
+    '<defs><linearGradient id="vg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+(gain?'var(--up)':'var(--down)')+'" stop-opacity=".18"/><stop offset="1" stop-color="'+(gain?'var(--up)':'var(--down)')+'" stop-opacity="0"/></linearGradient></defs>'+
+    '<polygon points="'+area+'" fill="url(#vg)"/>'+
     '<polyline points="'+pc+'" fill="none" stroke="var(--muted)" stroke-width="1.3" stroke-dasharray="4 3"/>'+
-    '<polyline points="'+pv+'" fill="none" stroke="var(--ink2)" stroke-width="2"/>'+
+    '<polyline points="'+pv+'" fill="none" stroke="'+(gain?'var(--up)':'var(--down)')+'" stroke-width="2"/>'+
     '<circle cx="'+X(arr.length-1).toFixed(1)+'" cy="'+Y(last.v).toFixed(1)+'" r="3" fill="var(--gold)"/>'+
-  '</svg><div class="sparklbl num"><span>'+arr[0].d.slice(5)+'</span><span>市值 '+fmt(last.v)+' / 投入 '+fmt(last.c)+'</span><span>'+last.d.slice(5)+'</span></div>';
+  '</svg><div class="sparklbl num"><span>'+arr[0].d.slice(5)+'</span><span>市值 '+fmt(last.v)+' / 投入 '+fmt(last.c)+(daily?'':' · 快照')+'</span><span>'+last.d.slice(5)+'</span></div>';
+}
+function renderMoChart(){
+  var el=document.getElementById('moChart'); if(!el) return;
+  var now=new Date(), months=[];
+  for(var k=5;k>=0;k--){ var d=new Date(now.getFullYear(), now.getMonth()-k, 1); months.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); }
+  var sums={}; months.forEach(function(m){ sums[m]=0; });
+  (state.tx||[]).forEach(function(t){ if(!t.date||t.kind==='sell')return; var m=t.date.slice(0,7); if(sums[m]==null)return; sums[m]+=(Number(t.sh)||0)*(Number(t.px)||0)+txFee(t); });
+  var vals=months.map(function(m){ return sums[m]; });
+  if(!vals.some(function(v){return v>0;})){ el.innerHTML=''; return; }
+  var plan=monthlyTarget();
+  var mxv=Math.max.apply(null, vals.concat([plan||0, 1]));
+  var W=330,H=96,bw=W/6;
+  var bars=months.map(function(m,i){
+    var v=vals[i], h=(H-26)*(v/mxv), x=i*bw+bw*0.18, y=H-14-h, cur=(i===5);
+    return '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+(bw*0.64).toFixed(1)+'" height="'+Math.max(h,1.5).toFixed(1)+'" rx="3" fill="var(--c-tw)" opacity="'+(cur?'1':'0.42')+'"/>'+
+      '<text x="'+(i*bw+bw/2).toFixed(1)+'" y="'+(H-3)+'" font-size="9.5" text-anchor="middle" fill="var(--muted)">'+(+m.slice(5))+'月</text>'+
+      (v>0?'<text x="'+(i*bw+bw/2).toFixed(1)+'" y="'+Math.max(y-3,8).toFixed(1)+'" font-size="8.5" text-anchor="middle" fill="var(--muted)">'+(v>=10000?((v/10000).toFixed(1).replace(/\.0$/,'')+'萬'):fmt(Math.round(v)))+'</text>':'');
+  }).join('');
+  var planLine='';
+  if(plan>0){ var py=H-14-(H-26)*(plan/mxv); planLine='<line x1="0" y1="'+py.toFixed(1)+'" x2="'+W+'" y2="'+py.toFixed(1)+'" stroke="var(--muted)" stroke-width="1" stroke-dasharray="4 3" opacity=".65"/>'; }
+  el.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;display:block;margin-top:10px">'+planLine+bars+'</svg>'+
+    '<div class="sparklbl"><span>近 6 個月投入</span>'+(plan>0?'<span>虛線＝每月計畫 '+fmt(plan)+'</span>':'')+'</div>';
 }
 function smartBlock(code, price, sm){
   var html='', r=sm.r, ma=sm.ma;
@@ -1401,6 +1462,21 @@ function render(){
   const d=document.getElementById('hDelta'); d.textContent=(t.pnl>=0?'+':'−')+fmt(Math.abs(t.pnl))+' NT$';
   d.style.color=t.pnl>0?'#FF9B91':(t.pnl<0?'#9FE3B8':'#cdd');
   document.getElementById('hChip').textContent=(t.ret>=0?'+':'−')+pct(Math.abs(t.ret));
+  // 最近一個交易日的漲跌（用每日收盤歷史算）
+  (function(){
+    var el=document.getElementById('hDay'); if(!el) return;
+    var sum=0, any=false, lastD='';
+    hs.forEach(function(h){
+      if(!(h.sh>0)) return;
+      var arr=(state.priceHist&&state.priceHist[h.code])||[]; if(arr.length<2) return;
+      sum+=h.sh*(arr[arr.length-1].p-arr[arr.length-2].p); any=true;
+      if(arr[arr.length-1].d>lastD) lastD=arr[arr.length-1].d;
+    });
+    if(!any||!lastD){ el.style.display='none'; return; }
+    el.style.display='';
+    el.textContent=(lastD===dstr(0)?'今日':mmdd(lastD))+' '+(sum>=0?'▲':'▼')+fmt(Math.abs(Math.round(sum)));
+    el.style.color=sum>0?'#FF9B91':(sum<0?'#9FE3B8':'#cdd');
+  })();
   var xr=annualReturn(state.tx, t.val);
   document.getElementById('hXirr').textContent = xr==null ? '年化報酬率（XIRR）：交易太少，暫無法估算' : '年化報酬率（XIRR）約 '+(xr>=0?'+':'−')+pct(Math.abs(xr))+'　·　長期持有試算';
 
@@ -1454,6 +1530,7 @@ function render(){
   if(moSell>0){ moSellRow.style.display=''; document.getElementById('moSell').textContent='+'+fmt(Math.round(moSell)); } else { moSellRow.style.display='none'; }
   var moPlan=monthlyTarget();
   document.getElementById('moPlan').textContent=fmt(moPlan);
+  renderMoChart();
   var moFill=document.getElementById('moBudgetFill'), moMsg=document.getElementById('moBudgetMsg');
   moFill.style.width=(moPlan?Math.min(1,moBudgetUse/moPlan)*100:0)+'%';
   if(moPlan<=0){ moMsg.textContent='尚未設定定期定額計畫'; moMsg.className='pgmsg'; moFill.className='mobarfill'; }
@@ -1602,9 +1679,18 @@ function render(){
   // holdings (持倉頁：只參照；編輯交易請到「記錄」)
   const hl=document.getElementById('holdList'); hl.innerHTML='';
   const held=hs.filter(h=>h.sh>0);
+  function miniSpark(code){
+    var cs=dstr(-90), pts=((state.priceHist&&state.priceHist[code])||[]).filter(function(x){return x.d>=cs;}).map(function(x){return Number(x.p)||0;}).filter(function(v){return v>0;});
+    if(pts.length<5) return '';
+    var W=64,H=22,P=2, mn=Math.min.apply(null,pts), mx=Math.max.apply(null,pts); if(mx<=mn) mx=mn+1;
+    var X=function(i){return P+(W-2*P)*i/(pts.length-1);}, Y=function(v){return P+(H-2*P)*(1-(v-mn)/(mx-mn));};
+    var pl=pts.map(function(v,i){return X(i).toFixed(1)+','+Y(v).toFixed(1);}).join(' ');
+    var col=pts[pts.length-1]>=pts[0]?'var(--up)':'var(--down)';
+    return '<svg class="hspk" viewBox="0 0 '+W+' '+H+'" style="width:64px;height:22px;flex:none;margin:0 10px 0 auto;align-self:center"><polyline points="'+pl+'" fill="none" stroke="'+col+'" stroke-width="1.5" opacity=".75"/></svg>';
+  }
   function holdRow(h){
     var ann=(function(){var x=annualReturn(state.tx.filter(function(t){return t.code===h.code;}),h.val);return x==null?'':'<span class="num" style="color:var(--muted)">年化 '+(x>=0?'+':'−')+pct(Math.abs(x))+'</span>';})();
-    return '<div class="hold"><div class="hhead" data-code="'+h.code+'"><div class="nm">'+h.name+'<small>'+h.code+' · '+dispCatOf(h.code,h.cat)+'</small></div><div class="val num">'+fmt(h.val)+' <span class="chev">›</span></div></div>'+
+    return '<div class="hold"><div class="hhead" data-code="'+h.code+'"><div class="nm">'+h.name+'<small>'+h.code+' · '+dispCatOf(h.code,h.cat)+'</small></div>'+miniSpark(h.code)+'<div class="val num">'+fmt(h.val)+' <span class="chev">›</span></div></div>'+
       '<div class="meta"><span class="num">'+shStr(h.code,h.sh)+' '+unitWord(h.code)+'</span><span class="num">均價 '+fmt2(h.avg)+'</span>'+
       '<span class="pl '+plClass(h.pnl)+' num">'+(h.pnl>=0?'+':'−')+fmt(Math.abs(h.pnl))+'（'+(h.ret>=0?'+':'−')+pct(Math.abs(h.ret))+'）</span>'+ann+'</div></div>';
   }
@@ -2640,7 +2726,7 @@ function fetchAutoPrices(){
         var e=j.prices[code]||{}, p=Number(e.p);
         if(!(p>0)) return;
         if(Number(state.prices[code])!==p){ state.prices[code]=p; changed=true; }
-        recordPrice(code,p);
+        // 歷史由下方 hist 併入（含正確日期），這裡不再用今天的日期重複記錄
         if(e.d&&e.d>latest) latest=e.d;
       });
       // 歷史日收盤併入 priceHist（走勢圖、近3月高低、加碼判讀都靠它）
@@ -2655,6 +2741,12 @@ function fetchAutoPrices(){
             if(x&&x.d&&p2>0&&!have[x.d]){ cur.push({d:x.d,p:p2}); changed=true; }
           });
           cur.sort(function(a,b){ return a.d<b.d?-1:1; });
+          // 清掉舊版在「今天」重複記錄收盤價造成的幽靈點（會讓今日漲跌顯示 0）
+          var td=dstr(0);
+          if(cur.length>=2){
+            var lastE=cur[cur.length-1], prevE=cur[cur.length-2];
+            if(lastE.d===td && lastE.p===prevE.p && !(j.hist[code]||[]).some(function(x){return x.d===td;})) cur.pop();
+          }
           state.priceHist[code]=cur.filter(function(x){ return x.d>=cs; });
         });
       }
