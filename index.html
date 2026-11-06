@@ -952,7 +952,7 @@ nav button.on .ic{transform:translateY(-1px)}
         <p class="note" style="margin:8px 0 0">依你記錄的持倉、現金與計畫自動判斷，為 MJ老師公開教學心法的整理與自我對照，非投資建議。</p>
       </div>
     </div>
-    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v104</p>
+    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v105</p>
   </section>
 
   <!-- 交割 -->
@@ -2530,6 +2530,7 @@ function slipCodeOf(name){
 function parseSlip(text){
   text=String(text||'').replace(/[！-～]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-0xFEE0);}).replace(/　/g,' '); // 全形轉半形
   text=text.replace(/([一-鿿])[ \t]+(?=[一-鿿])/g,'$1'); // OCR 常把中文逐字隔開：併回去
+  text=text.replace(/(\d)\s*([,.])\s*(\d)/g,'$1$2$3'); // 數字中被 OCR 塞進空格：4 ,626 → 4,626
   // 日期：民國 115 年 11 月 5 日，或 2026/11/05
   var date='', m=text.match(/(\d{2,4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
   if(m){ var y=+m[1]; if(y<1911)y+=1911; date=y+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0'); }
@@ -2557,12 +2558,21 @@ function parseSlip(text){
     // 欄位：數量 [現沖] 成交價 價金 手續費 交易稅 …；用「價金≈數量×成交價」對位
     // OCR 可能把名稱裡的數字（台灣「50」）或現沖欄弄歪，所以在前幾個位置掃描對位
     var near=function(a,b){ return Math.abs(a-b)<=Math.max(2, a*0.01); };
-    var sh=null, px=null, fee=0, tax=0, found=false;
+    var sh=null, px=null, fee=0, tax=0, found=false, warn=false;
     var tryAt=function(qi,pi){ var q=nums[qi], p=nums[pi], a=nums[pi+1]; if(q>=1&&p>0&&a>0&&near(q*p,a)){ sh=q; px=p; fee=nums[pi+2]||0; tax=nums[pi+3]||0; found=true; } return found; };
     tryAt(0,2) || tryAt(0,1); // 標準：數量 現沖 成交價 價金／數量 成交價 價金
     if(!found){ for(var qi=0; qi<=2&&!found; qi++){ for(var pi=qi+1; pi<=qi+2&&pi+1<nums.length&&!found; pi++){ tryAt(qi,pi); } } }
+    if(!found){
+      // 寬鬆備援：OCR 把某個數字認錯導致對不上時，抓「整數股數＋帶小數成交價」先列出來，標記待核對
+      for(var qi2=0; qi2<nums.length-1 && !found; qi2++){
+        var q2=nums[qi2], p2=nums[qi2+1];
+        if(Number.isInteger(q2)&&q2>=1&&q2<100000 && p2>0&&p2<100000 && !Number.isInteger(p2)){ sh=q2; px=p2; fee=null; tax=0; found=true; warn=true; }
+      }
+    }
     if(!found) continue;
-    rows.push({kind:kind, name:name, code:slipCodeOf(name), sh:sh, px:px, fee:fee, tax:tax, date:date});
+    var row={kind:kind, name:name, code:slipCodeOf(name), sh:sh, px:px, fee:fee, tax:tax, date:date};
+    if(warn) row.warn=true;
+    rows.push(row);
   }
   return rows;
 }
@@ -2588,15 +2598,20 @@ function renderSlipList(){
     var codeCell = r.code
       ? '<b>'+(meta(r.code).name||r.code)+'</b> <small>'+r.code+'</small>'
       : '<select class="slipcode" data-i="'+i+'" style="max-width:150px"><option value="">選標的…</option>'+codeOptionsHTML(selectableCatalog())+'</select>';
+    var detail = r.warn
+      ? '<small style="color:#B3261E">⚠ 辨識數字對不上，核對／修正後再勾：</small><br><small class="num">股數 <input class="slipsh num" data-i="'+i+'" type="number" inputmode="decimal" value="'+r.sh+'" style="width:76px;padding:4px;border:1px solid var(--line);border-radius:6px"> × 單價 <input class="slippx num" data-i="'+i+'" type="number" inputmode="decimal" step="0.01" value="'+r.px+'" style="width:88px;padding:4px;border:1px solid var(--line);border-radius:6px">　'+(r.date||'')+'</small>'
+      : '<small class="num">'+fmt(r.sh)+' 股 × '+fmt2(r.px)+'　手續費 '+fmt(r.fee)+(r.tax?'　稅 '+fmt(r.tax):'')+'　'+(r.date||'')+(dup?'　<b style="color:#B3261E">已有相同記錄</b>':'')+'</small>';
     return '<div class="pricerow2" style="align-items:center">'+
       '<label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer">'+
-        '<input type="checkbox" class="slipck" data-i="'+i+'"'+((r.code&&!dup)?' checked':'')+' style="width:19px;height:19px;flex:none">'+
+        '<input type="checkbox" class="slipck" data-i="'+i+'"'+((r.code&&!dup&&!r.warn)?' checked':'')+' style="width:19px;height:19px;flex:none">'+
         '<span><span class="kbadge '+(r.kind==='sell'?'sell':'spot')+'">'+(r.kind==='sell'?'賣出':'現買')+'</span> '+codeCell+
-        '<br><small class="num">'+fmt(r.sh)+' 股 × '+fmt2(r.px)+'　手續費 '+fmt(r.fee)+(r.tax?'　稅 '+fmt(r.tax):'')+'　'+(r.date||'')+(dup?'　<b style="color:#B3261E">已有相同記錄</b>':'')+'</small></span>'+
+        '<br>'+detail+'</span>'+
       '</label></div>';
   }).join('');
   document.getElementById('slipImport').style.display='';
   box.querySelectorAll('.slipcode').forEach(function(sel){ sel.onchange=function(){ slipRows[+sel.dataset.i].code=sel.value; renderSlipList(); }; });
+  box.querySelectorAll('.slipsh').forEach(function(inp){ inp.oninput=function(){ var v=parseFloat(inp.value); if(v>0) slipRows[+inp.dataset.i].sh=v; }; inp.onclick=function(e){ e.preventDefault(); e.stopPropagation(); inp.focus(); }; });
+  box.querySelectorAll('.slippx').forEach(function(inp){ inp.oninput=function(){ var v=parseFloat(inp.value); if(v>0) slipRows[+inp.dataset.i].px=v; }; inp.onclick=function(e){ e.preventDefault(); e.stopPropagation(); inp.focus(); }; });
 }
 document.getElementById('slipBtn').onclick=openSlip;
 document.getElementById('slipX').onclick=closeSlip;
@@ -2673,7 +2688,8 @@ document.getElementById('slipImport').onclick=function(){
       if(!cur||cur.sh<r.sh){ skip.push(r.name+'（持股不足）'); return; }
     }
     var info=meta(r.code);
-    var t={code:r.code, name:info.name, cat:info.cat, sh:r.sh, px:r.px, date:r.date||'', kind:r.kind==='dca'?'dca':(r.kind==='sell'?'sell':'spot'), fee:r.fee};
+    var t={code:r.code, name:info.name, cat:info.cat, sh:r.sh, px:r.px, date:r.date||'', kind:r.kind==='dca'?'dca':(r.kind==='sell'?'sell':'spot')};
+    if(r.fee!=null) t.fee=r.fee; // 待核對列手續費留空＝自動估算
     state.tx.push(t);
     if(state.prices[r.code]==null) state.prices[r.code]=r.px;
     n++;
