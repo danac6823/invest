@@ -952,7 +952,7 @@ nav button.on .ic{transform:translateY(-1px)}
         <p class="note" style="margin:8px 0 0">依你記錄的持倉、現金與計畫自動判斷，為 MJ老師公開教學心法的整理與自我對照，非投資建議。</p>
       </div>
     </div>
-    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v105</p>
+    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v106</p>
   </section>
 
   <!-- 交割 -->
@@ -2576,6 +2576,16 @@ function parseSlip(text){
   }
   return rows;
 }
+// 判別定期定額：金額接近某個啟用中的計畫，或手續費 ≤1 元（台新定期定額固定 1 元；一般現買低消 20）
+function slipClassify(rows){
+  (rows||[]).forEach(function(r){
+    if(r.kind!=='spot') return;
+    var amt=r.sh*r.px;
+    var planHit=(state.plans||[]).some(function(p){ return p.on && p.code===r.code && amt<=Number(p.amount)*1.02 && amt>=Number(p.amount)*0.7; });
+    if(planHit || (r.fee>0 && r.fee<=1)) r.kind='dca';
+  });
+  return rows;
+}
 function slipDup(r){
   var code=r.code; if(!code) return false;
   return (state.tx||[]).some(function(t){ return t.code===code && (t.date||'')===(r.date||'') && Number(t.sh)===r.sh && Number(t.px)===r.px && ((t.kind==='sell')===(r.kind==='sell')); });
@@ -2601,15 +2611,22 @@ function renderSlipList(){
     var detail = r.warn
       ? '<small style="color:#B3261E">⚠ 辨識數字對不上，核對／修正後再勾：</small><br><small class="num">股數 <input class="slipsh num" data-i="'+i+'" type="number" inputmode="decimal" value="'+r.sh+'" style="width:76px;padding:4px;border:1px solid var(--line);border-radius:6px"> × 單價 <input class="slippx num" data-i="'+i+'" type="number" inputmode="decimal" step="0.01" value="'+r.px+'" style="width:88px;padding:4px;border:1px solid var(--line);border-radius:6px">　'+(r.date||'')+'</small>'
       : '<small class="num">'+fmt(r.sh)+' 股 × '+fmt2(r.px)+'　手續費 '+fmt(r.fee)+(r.tax?'　稅 '+fmt(r.tax):'')+'　'+(r.date||'')+(dup?'　<b style="color:#B3261E">已有相同記錄</b>':'')+'</small>';
+    var kindCell = r.kind==='sell'
+      ? '<span class="kbadge sell">賣出</span>'
+      : '<select class="slipkind" data-i="'+i+'" style="padding:2px 4px;border:1px solid var(--line);border-radius:6px;font-family:inherit;background:var(--card)">'+
+          '<option value="spot"'+(r.kind!=='dca'?' selected':'')+'>現買</option>'+
+          '<option value="dca"'+(r.kind==='dca'?' selected':'')+'>定期</option>'+
+        '</select>';
     return '<div class="pricerow2" style="align-items:center">'+
       '<label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer">'+
         '<input type="checkbox" class="slipck" data-i="'+i+'"'+((r.code&&!dup&&!r.warn)?' checked':'')+' style="width:19px;height:19px;flex:none">'+
-        '<span><span class="kbadge '+(r.kind==='sell'?'sell':'spot')+'">'+(r.kind==='sell'?'賣出':'現買')+'</span> '+codeCell+
+        '<span>'+kindCell+' '+codeCell+
         '<br>'+detail+'</span>'+
       '</label></div>';
   }).join('');
   document.getElementById('slipImport').style.display='';
   box.querySelectorAll('.slipcode').forEach(function(sel){ sel.onchange=function(){ slipRows[+sel.dataset.i].code=sel.value; renderSlipList(); }; });
+  box.querySelectorAll('.slipkind').forEach(function(sel){ sel.onchange=function(){ slipRows[+sel.dataset.i].kind=sel.value; }; sel.onclick=function(e){ e.stopPropagation(); }; });
   box.querySelectorAll('.slipsh').forEach(function(inp){ inp.oninput=function(){ var v=parseFloat(inp.value); if(v>0) slipRows[+inp.dataset.i].sh=v; }; inp.onclick=function(e){ e.preventDefault(); e.stopPropagation(); inp.focus(); }; });
   box.querySelectorAll('.slippx').forEach(function(inp){ inp.oninput=function(){ var v=parseFloat(inp.value); if(v>0) slipRows[+inp.dataset.i].px=v; }; inp.onclick=function(e){ e.preventDefault(); e.stopPropagation(); inp.focus(); }; });
 }
@@ -2620,7 +2637,7 @@ document.getElementById('slipCancel').onclick=closeSlip;
 document.getElementById('slipParse').onclick=function(){
   var t=document.getElementById('slipBox').value, st=document.getElementById('slipStatus');
   if(!t.trim()){ st.textContent='先把成交通知的內容貼進上面的框，或按「📷 傳截圖辨識」。'; return; }
-  slipRows=parseSlip(t);
+  slipRows=slipClassify(parseSlip(t));
   if(!slipRows.length){ st.textContent='沒有解析到交易——要有「現買／現賣＋數量＋成交價」才認得。整封 email 全選複製再貼，或改按「📷 傳截圖辨識」。'; renderSlipList(); return; }
   var unk=slipRows.filter(function(r){return !r.code;}).length;
   st.textContent='✓ 解析到 '+slipRows.length+' 筆'+(unk?('，其中 '+unk+' 筆請先選標的'):'')+'，勾選後按「匯入」。';
@@ -2654,7 +2671,7 @@ document.getElementById('slipFile').onchange=function(e){
     }).then(function(out){
       var txt=(out&&out.data&&out.data.text)||'';
       document.getElementById('slipBox').value=txt;
-      slipRows=parseSlip(txt);
+      slipRows=slipClassify(parseSlip(txt));
       if(!slipRows.length){ st.textContent='辨識完成，但沒解析到交易——看一下框裡辨識出的文字，手動修正錯字後再按「解析 ↓」。'; renderSlipList(); return; }
       var unk=slipRows.filter(function(r){return !r.code;}).length;
       st.textContent='✓ 截圖辨識＋解析到 '+slipRows.length+' 筆'+(unk?('，其中 '+unk+' 筆請先選標的'):'')+'。數字可能有辨識誤差，匯入前請核對。';
