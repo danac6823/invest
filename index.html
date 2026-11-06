@@ -537,22 +537,11 @@ nav button.on .ic{transform:translateY(-1px)}
       <div id="starSub" class="note" style="margin:3px 0 0">—</div>
     </div>
 
-    <div class="homesec">💰 我的狀態</div>
-    <div class="tiles4">
-      <button class="tile4" data-go="hold"><span class="tk4">總市值 · 點看總覽<span class="ic4">›</span></span><span class="tv4 num" id="tHoldVal">—</span><span class="tsub4 num delta" id="tHoldPnl"></span></button>
-      <button class="tile4" data-go="tx"><span class="tk4">本月投入<span class="ic4">›</span></span><span class="tv4 num" id="tMoUse">—</span><span class="tsub4 num" id="tMoPlan"></span></button>
-      <button class="tile4" data-go="cash:cashCard"><span class="tk4">交割戶餘額<span class="ic4">›</span></span><span class="tv4 num" id="tCash">—</span><span class="tsub4">買賣自動扣入</span></button>
-      <button class="tile4" data-go="alloc:resCard"><span class="tk4">預備金剩餘<span class="ic4">›</span></span><span class="tv4 num" id="tRes">—</span><span class="tsub4">逢深跌的子彈</span></button>
-    </div>
-
     <div class="homesec">⚡ 快速操作</div>
     <div class="shortgrid">
       <button class="short" data-go="modal:price"><span class="sic">📷</span>現價更新</button>
       <button class="short" data-go="modal:add"><span class="sic">＋</span>記一筆</button>
       <button class="short" data-go="modal:plan"><span class="sic">📅</span>定期定額</button>
-      <button class="short" data-go="alloc:addCard"><span class="shbadge" id="shSale"></span><span class="sic">🏷️</span>打折加碼表</button>
-      <button class="short" data-go="hold:distCard"><span class="sic">📊</span>資產分佈</button>
-      <button class="short" data-go="learn:learnTop"><span class="sic">📚</span>小抄工具</button>
     </div>
 
     <div class="homesec">📋 接下來該做什麼</div>
@@ -966,7 +955,7 @@ nav button.on .ic{transform:translateY(-1px)}
         <p class="note" style="margin:8px 0 0">依你記錄的持倉、現金與計畫自動判斷，為 MJ老師公開教學心法的整理與自我對照，非投資建議。</p>
       </div>
     </div>
-    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v114</p>
+    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v115</p>
   </section>
 
   <!-- 交割 -->
@@ -1492,8 +1481,10 @@ function render(){
     });
     if(!any||!lastD){ el.style.display='none'; return; }
     el.style.display='';
-    el.textContent=(lastD===dstr(0)?'今日':mmdd(lastD))+' '+(sum>=0?'▲':'▼')+fmt(Math.abs(Math.round(sum)));
+    el.textContent=(lastD===dstr(0)?'今日':mmdd(lastD))+' '+(sum>=0?'▲':'▼')+fmt(Math.abs(Math.round(sum)))+' ›';
     el.style.color=sum>0?'#8F1D17':(sum<0?'#14532D':'rgba(74,46,0,.55)');
+    el.style.cursor='pointer';
+    el.onclick=openDayChange;
   })();
   var xr=annualReturn(state.tx, t.val);
   document.getElementById('hXirr').textContent = xr==null ? '年化報酬率（XIRR）：交易太少，暫無法估算' : '年化報酬率（XIRR）約 '+(xr>=0?'+':'−')+pct(Math.abs(xr))+'　·　長期持有試算';
@@ -2512,6 +2503,57 @@ function switchTab(name){
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
 
 var SPLITS={'5904':{d:'2026-08-10',t:'1拆10'}}; // 股票分割：圖上畫分割線；該檔分割前歷史價已換算為分割後基準
+function openDayChange(){
+  var hs=holdings(), ph=state.priceHist||{};
+  var lastD=''; hs.forEach(function(h){ if(!(h.sh>0))return; var a=ph[h.code]||[]; if(a.length&&a[a.length-1].d>lastD) lastD=a[a.length-1].d; });
+  if(!lastD) return;
+  var codes=[], seen={};
+  hs.forEach(function(h){ if(h.sh>0&&!seen[h.code]){seen[h.code]=1;codes.push(h.code);} });
+  (state.tx||[]).forEach(function(t){ if(t.date===lastD&&t.code&&!seen[t.code]){seen[t.code]=1;codes.push(t.code);} });
+  var mc=mergedCatalog(), items=[], tot=0, anyTx=false;
+  codes.forEach(function(code){
+    var a=ph[code]||[], nm=(mc[code]||{}).name||code;
+    var pLast=null, pPrev=null;
+    if(a.length>=2&&a[a.length-1].d===lastD){ pLast=Number(a[a.length-1].p); pPrev=Number(a[a.length-2].p); }
+    else if(a.length){ pLast=Number(a[a.length-1].p); }
+    var h=null; for(var i=0;i<hs.length;i++) if(hs[i].code===code){ h=hs[i]; break; }
+    var shNow=h?h.sh:0, dB=0, dS=0, buyPnl=0, sellPnl=0, kinds=[];
+    (state.tx||[]).forEach(function(t){
+      if(t.code!==code||t.date!==lastD) return;
+      var sh=Number(t.sh)||0, px=Number(t.px)||0; if(!sh) return;
+      anyTx=true;
+      if(t.kind==='sell'){ dS+=sh; if(pPrev!=null) sellPnl+=sh*(px-pPrev); if(kinds.indexOf('賣出')<0)kinds.push('賣出'); }
+      else { dB+=sh; if(pLast!=null) buyPnl+=sh*(pLast-px); var kl=t.kind==='dca'?'定期':'現買'; if(kinds.indexOf(kl)<0)kinds.push(kl); }
+    });
+    var shPrev=shNow-dB+dS, pnl=null;
+    if(pLast!=null&&pPrev!=null) pnl=(shPrev-dS)*(pLast-pPrev)+buyPnl+sellPnl;
+    else if(pLast!=null&&(dB||dS)) pnl=buyPnl+sellPnl;
+    if(pnl!=null) tot+=pnl;
+    items.push({code:code,nm:nm,pLast:pLast,pPrev:pPrev,dB:dB,dS:dS,kinds:kinds,pnl:pnl});
+  });
+  items.sort(function(x,y){ return Math.abs(y.pnl||0)-Math.abs(x.pnl||0); });
+  var isToday=lastD===dstr(0);
+  var rowsH=items.map(function(it){
+    var pc=(it.pLast!=null&&it.pPrev!=null)?((it.pLast-it.pPrev)/it.pPrev*100):null;
+    var priceTxt=(pc!=null)?(fmt2(it.pPrev)+' → '+fmt2(it.pLast)+'（'+(pc>=0?'+':'−')+Math.abs(pc).toFixed(1)+'%）'):'尚無當日報價';
+    var dsh=it.dB-it.dS;
+    var shTxt=(it.dB||it.dS)?('股數 '+(dsh>=0?'+':'−')+shStr(it.code,Math.abs(dsh))+'（'+it.kinds.join('/')+'）'):'持股不變';
+    var pnlTxt=it.pnl==null?'—':((it.pnl>=0?'+':'−')+fmt(Math.abs(Math.round(it.pnl))));
+    var cls=it.pnl==null?'zero':(it.pnl>0?'pos':(it.pnl<0?'neg':'zero'));
+    return '<div style="padding:10px 0;border-bottom:1px solid var(--line)">'+
+      '<div style="display:flex;justify-content:space-between;gap:8px"><span><b>'+it.nm+'</b> <small style="color:var(--muted)">'+it.code+'</small></span><span class="num '+cls+'" style="font-weight:700">'+pnlTxt+'</span></div>'+
+      '<div class="num" style="font-size:12.5px;color:var(--muted);margin-top:2px">'+priceTxt+'　·　'+shTxt+'</div>'+
+    '</div>';
+  }).join('');
+  document.getElementById('lbSheet').innerHTML=
+    '<div class="lbtop"><div class="lbnm">'+(isToday?'今日變化':mmdd(lastD)+' 變化')+'<small>'+lastD+' 收盤 vs 前一交易日</small></div><button class="lbclose" id="lbX">✕</button></div>'+
+    rowsH+
+    '<div class="num" style="display:flex;justify-content:space-between;padding:12px 0 2px;font-weight:700"><span>合計</span><span class="'+(tot>0?'pos':(tot<0?'neg':'zero'))+'">'+(tot>=0?'+':'−')+fmt(Math.abs(Math.round(tot)))+'</span></div>'+
+    '<p class="note" style="margin-top:8px">當日損益＝原持股 × 當日價差'+(anyTx?' ＋ 當天買進 ×（收盤 − 成交價）＋ 當天賣出 ×（成交價 − 昨收）':'')+'，未計手續費與稅。'+(anyTx?'':'當天沒有買賣。')+'</p>';
+  var lb=document.getElementById('lightbox'); lb.classList.add('on'); document.body.style.overflow='hidden';
+  document.getElementById('lbX').onclick=closeLightbox;
+  lb.onclick=function(e){ if(e.target===lb) closeLightbox(); };
+}
 function lbChart(code, h){
   var arr=((state.priceHist&&state.priceHist[code])||[]).filter(function(x){return Number(x.p)>0;});
   if(arr.length<2) return '';
