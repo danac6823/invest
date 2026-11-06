@@ -37,14 +37,16 @@ async function getJson(url) {
 // 讀上一次的結果當底，抓不到的代號保留舊值；hist = 近 130 天日收盤（供 app 畫走勢、算近3月高低）
 let prices = {};
 let hist = {};
+let divs = {};
 let prevJson = '';
 try {
   prevJson = readFileSync(OUT, 'utf8');
   const prev = JSON.parse(prevJson);
   prices = prev.prices || {};
   hist = prev.hist || {};
+  divs = prev.divs || {};
 } catch {}
-const before = JSON.stringify({ prices, hist });
+const before = JSON.stringify({ prices, hist, divs });
 
 const HIST_DAYS = 130;
 function cutoffIso() {
@@ -124,6 +126,40 @@ for (const [code, cnyesId] of Object.entries(FUNDS)) {
     const it = j.items || {};
     setPx(code, it.nav, tsToIso(it.priceDate), 'cnyes');
   } catch (e) { errors.push(`fund ${code}: ` + e.message); }
+}
+
+// ── 4b. 除權息（上市＋上櫃預告表）：持股代號的現金股利，累積保留近 120 天＋未來 60 天 ──
+{
+  const codeSet = new Set(TW_CODES);
+  const upsertDiv = (code, d, cash) => {
+    cash = Number(cash);
+    if (!d || !(cash > 0)) return;
+    const a = divs[code] || (divs[code] = []);
+    const i = a.findIndex(x => x.d === d);
+    if (i >= 0) a[i].cash = cash; else a.push({ d, cash });
+  };
+  try {
+    const rows = await getJson('https://openapi.twse.com.tw/v1/exchangeReport/TWT48U_ALL');
+    for (const r of rows) {
+      if (!codeSet.has(r.Code)) continue;
+      if (String(r.Exdividend || '').indexOf('息') < 0) continue; // 只記現金股利（除權不產生現金）
+      upsertDiv(r.Code, rocToIso(r.Date), r.CashDividend);
+    }
+  } catch (e) { errors.push('div-twse: ' + e.message); }
+  try {
+    const rows = await getJson('https://www.tpex.org.tw/openapi/v1/tpex_exright_prepost');
+    for (const r of rows) {
+      if (!codeSet.has(r.SecuritiesCompanyCode)) continue;
+      if (String(r.ExRrightsExDividend || '').indexOf('息') < 0) continue;
+      upsertDiv(r.SecuritiesCompanyCode, rocToIso(r.ExRrightsExDividendDate), r.CashDividend);
+    }
+  } catch (e) { errors.push('div-tpex: ' + e.message); }
+  const lo = new Date(Date.now() - 120 * 864e5).toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
+  const hi = new Date(Date.now() + 60 * 864e5).toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
+  for (const k of Object.keys(divs)) {
+    divs[k] = divs[k].filter(x => x.d >= lo && x.d <= hi).sort((a, b) => (a.d < b.d ? -1 : 1));
+    if (!divs[k].length) delete divs[k];
+  }
 }
 
 // ── 5. 歷史回補（node fetch-prices.mjs --backfill，一次性）──
@@ -206,7 +242,7 @@ for (const [code, e] of Object.entries(prices)) upsertHist(code, e.d, e.p);
 trimHist();
 
 // ── 輸出（價格沒變就不動檔案，避免無意義的 commit）───
-if (JSON.stringify({ prices, hist }) === before && prevJson) {
+if (JSON.stringify({ prices, hist, divs }) === before && prevJson) {
   console.log('no price change, skip write', errors.length ? `(errors: ${errors.join('; ')})` : '');
 } else {
   const out = {
@@ -214,6 +250,7 @@ if (JSON.stringify({ prices, hist }) === before && prevJson) {
     errors: errors.length ? errors : undefined,
     prices,
     hist,
+    divs: Object.keys(divs).length ? divs : undefined,
   };
   writeFileSync(OUT, JSON.stringify(out) + '\n');
   console.log(`OK ${Object.keys(prices).length} codes`, errors.length ? `(errors: ${errors.join('; ')})` : '');

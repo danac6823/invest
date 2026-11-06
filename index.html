@@ -537,6 +537,8 @@ nav button.on .ic{transform:translateY(-1px)}
       <div id="starSub" class="note" style="margin:3px 0 0">—</div>
     </div>
 
+    <div id="bakBanner"></div>
+
     <div class="homesec">⚡ 快速操作</div>
     <div class="shortgrid">
       <button class="short" data-go="modal:price"><span class="sic">📷</span>現價更新</button>
@@ -564,6 +566,16 @@ nav button.on .ic{transform:translateY(-1px)}
       <div class="kv"><span class="k">半導體穿透曝險</span><span class="v num" id="ltSemi">—</span></div>
       <details class="hint"><summary>什麼是穿透</summary><p class="note">穿透＝把 0050／006208 及基金裡的成分還原後，實際壓在台積電／半導體的比重。基金依各自成分權重計入（可在設定 ⚙ 調整）。</p></details>
     </div>
+
+    <div class="homesec">🔮 長期試算</div>
+    <div class="card">
+      <p class="eyebrow">複利試算 · 紀律走 20 年會到哪</p>
+      <div id="projChart"></div>
+    </div>
+    <div class="card">
+      <p class="eyebrow">🛡 大跌壓力測試</p>
+      <div id="stressBox"></div>
+    </div>
   </section>
 
   <!-- 帳戶 -->
@@ -573,6 +585,7 @@ nav button.on .ic{transform:translateY(-1px)}
       <p class="eyebrow" style="margin:0 0 6px">交割帳戶餘額</p>
       <div class="cashbig"><span class="cur">NT$</span> <span id="cashBal" class="num">—</span></div>
       <p class="note" style="margin:0 0 10px">買進自動扣、賣出自動入帳。</p>
+      <div id="divNotice"></div>
       <div id="pendingSettle" class="pendbox" style="display:none"></div>
       <button class="btn ghost" id="addCashBtn">＋ 入金／股利／出金</button>
       <div id="cashForm" class="planform" style="display:none">
@@ -739,6 +752,13 @@ nav button.on .ic{transform:translateY(-1px)}
     <div class="card" id="valCard">
       <p class="eyebrow">📈 市值走勢 <span class="vlegend"><i class="vl vl1"></i>市值 <i class="vl vl2"></i>投入成本</span></p>
       <div id="valChart"></div>
+    </div>
+    <div class="card" id="heatCard" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <p class="eyebrow" style="margin:0">📅 每日損益月曆</p>
+        <span style="display:flex;align-items:center;gap:6px"><button id="heatPrev" class="pacts-b" style="border:1px solid var(--line);background:var(--card);border-radius:7px;width:26px;height:26px;font-size:14px;cursor:pointer;color:var(--ink)">‹</button><b id="heatLabel" class="num" style="font-size:13px">—</b><button id="heatNext" style="border:1px solid var(--line);background:var(--card);border-radius:7px;width:26px;height:26px;font-size:14px;cursor:pointer;color:var(--ink)">›</button></span>
+      </div>
+      <div id="heatGrid" style="margin-top:10px"></div>
     </div>
     <div class="card" id="distCard">
       <p class="eyebrow">資產分佈</p>
@@ -955,7 +975,7 @@ nav button.on .ic{transform:translateY(-1px)}
         <p class="note" style="margin:8px 0 0">依你記錄的持倉、現金與計畫自動判斷，為 MJ老師公開教學心法的整理與自我對照，非投資建議。</p>
       </div>
     </div>
-    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v115</p>
+    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v116</p>
   </section>
 
   <!-- 交割 -->
@@ -1441,6 +1461,108 @@ function renderAssist(){
   box.style.display='block';
 }
 
+// ── 股利提醒：除息日前持有股數 × 每股息，一鍵記入帳 ──
+function shAt(code,d){ var s=0; (state.tx||[]).forEach(function(t){ if(t.code!==code||!t.date||!(t.date<d))return; var sh=Number(t.sh)||0; s+=(t.kind==='sell'?-sh:sh); }); return Math.round(s*10000)/10000; }
+function renderDivNotice(){
+  var el=document.getElementById('divNotice'); if(!el) return;
+  var divs=state.divs||{}, today=dstr(0), from=dstr(-45), to=dstr(30), bk=state.divBook||{}, mc=mergedCatalog();
+  var acts=[], soon=[];
+  Object.keys(divs).forEach(function(code){
+    (divs[code]||[]).forEach(function(x){
+      if(!x||!x.d||!(Number(x.cash)>0)) return;
+      var sh=shAt(code,x.d); if(!(sh>0)) return;
+      var amt=Math.round(sh*Number(x.cash)); if(amt<1) return;
+      var nm=(mc[code]||{}).name||code;
+      if(x.d<=today && x.d>=from && !bk[code+'_'+x.d]) acts.push({key:code+'_'+x.d,nm:nm,code:code,d:x.d,cash:Number(x.cash),sh:sh,amt:amt});
+      else if(x.d>today && x.d<=to) soon.push({nm:nm,d:x.d,cash:Number(x.cash),amt:amt});
+    });
+  });
+  if(!acts.length&&!soon.length){ el.innerHTML=''; return; }
+  var h='';
+  acts.forEach(function(a,i){ h+='<div class="pendbox" style="display:flex;align-items:center;gap:8px;margin:0 0 8px"><span style="flex:1">💸 <b>'+a.nm+'</b> '+mmdd(a.d)+' 除息 '+a.cash+' 元/股 × '+shStr(a.code,a.sh)+' '+unitWord(a.code)+' ≈ <b>'+fmt(a.amt)+'</b> 元</span><button class="btn" style="width:auto;padding:7px 11px;font-size:13px" data-divadd="'+i+'">記股利</button><button style="border:1px solid var(--line);background:none;border-radius:50%;width:26px;height:26px;color:var(--muted);cursor:pointer" data-divx="'+i+'">✕</button></div>'; });
+  if(soon.length) h+='<p class="note" style="margin:0 0 10px">📅 即將除息：'+soon.map(function(s){ return s.nm+' '+mmdd(s.d)+'（'+s.cash+' 元/股 ≈ '+fmt(s.amt)+' 元）'; }).join('、')+'。入帳後會在這裡提醒你記一筆。</p>';
+  el.innerHTML=h;
+  el.querySelectorAll('[data-divadd]').forEach(function(b){ b.onclick=function(){ var a=acts[+b.dataset.divadd]; if(!state.divBook)state.divBook={}; state.divBook[a.key]=1; state.cashTx.push({type:'dividend',amount:a.amt,date:dstr(0),note:a.nm+' 配息 '+a.cash+'×'+a.sh}); save(); render(); }; });
+  el.querySelectorAll('[data-divx]').forEach(function(b){ b.onclick=function(){ var a=acts[+b.dataset.divx]; if(!state.divBook)state.divBook={}; state.divBook[a.key]=1; save(); render(); }; });
+}
+// ── 備份保護：超過 30 天沒備份就提醒（資料只在 localStorage）──
+function renderBak(){
+  var el=document.getElementById('bakBanner'); if(!el) return;
+  if(!(state.tx||[]).length && !(state.cashTx||[]).length){ el.innerHTML=''; return; }
+  var lb=state.lastBackup||'', days=lb?Math.floor(daysBetween(lb,dstr(0))):null;
+  if(lb && days<=30){ el.innerHTML=''; return; }
+  el.innerHTML='<div class="card" style="border-left:4px solid var(--up);display:flex;align-items:center;gap:10px"><div style="flex:1"><b>💾 該備份了</b><div class="note" style="margin:3px 0 0">資料只存在這支手機，換機或清瀏覽資料會消失。'+(lb?('上次備份 '+days+' 天前。'):'還沒備份過。')+'</div></div><button class="btn" style="width:auto;padding:9px 13px;font-size:13.5px;flex:none" id="bakNow">立即備份</button></div>';
+  var bn=document.getElementById('bakNow'); if(bn) bn.onclick=doExport;
+}
+// ── 長期複利試算：保守4%／中性7%／樂觀10%，月複利 ──
+function renderProj(){
+  var el=document.getElementById('projChart'); if(!el) return;
+  var R=totals(), P0=(R.t.val||0)+Math.max(cashBalance(),0)+reserveLeft(), C=monthlyTarget();
+  if(!(P0>0)&&!(C>0)){ el.innerHTML='<p class="note" style="margin:0">有持倉或設定每月計畫後，這裡會畫出 20 年複利曲線。</p>'; return; }
+  var YRS=20, rates=[{r:0.04,c:'var(--muted)',l:'保守 4%'},{r:0.07,c:'var(--brand2)',l:'中性 7%'},{r:0.10,c:'var(--c-us)',l:'樂觀 10%'}];
+  var series=rates.map(function(o){ var pts=[], i=o.r/12; for(var y=0;y<=YRS;y++){ var f=Math.pow(1+i,y*12); pts.push(P0*f + C*(f-1)/i); } return pts; });
+  var mx=series[2][YRS], W=340,H=150,P=8;
+  var X=function(y){return P+(W-2*P)*y/YRS;}, Y=function(v){return H-P-(H-2*P)*v/mx;};
+  var svg='';
+  series.forEach(function(pts,si){ var d=pts.map(function(v,y){return (y?'L':'M')+X(y).toFixed(1)+' '+Y(v).toFixed(1);}).join(''); svg+='<path d="'+d+'" fill="none" stroke="'+rates[si].c+'" stroke-width="'+(si===1?2.2:1.4)+'"'+(si===1?'':' stroke-dasharray="4 3"')+'/>'; });
+  var fmtW=function(v){ return v>=1e8?((v/1e8).toFixed(1)+' 億'):(v>=1e4?(Math.round(v/1e4)+' 萬'):fmt(Math.round(v))); };
+  var mil=[5,10,20].map(function(y){ return '<div class="kv"><span class="k">'+y+' 年後</span><span class="v num">約 '+fmtW(series[1][y])+'<small style="color:var(--muted)">（'+fmtW(series[0][y])+' ~ '+fmtW(series[2][y])+'）</small></span></div>'; }).join('');
+  el.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;display:block;background:var(--paper);border-radius:10px">'+svg+'</svg>'+
+    '<div class="tline" style="margin-top:6px">'+rates.map(function(o){return '<span style="color:'+o.c+'">━</span> '+o.l;}).join('　')+'</div>'+mil+
+    '<p class="note" style="margin-top:6px">以目前總資產 '+fmt(Math.round(P0))+'＋每月投入 '+fmt(C)+' 月複利試算，未計通膨與稅費，僅供長期紀律參考。</p>';
+}
+// ── 大跌壓力測試：比氣長 ──
+function renderStress(){
+  var el=document.getElementById('stressBox'); if(!el) return;
+  var R=totals(), val=R.t.val||0;
+  if(!(val>0)){ el.innerHTML='<p class="note" style="margin:0">有持倉後，這裡試算大跌時的家底還剩多少、子彈夠不夠。</p>'; return; }
+  var cash=Math.max(cashBalance(),0), res=reserveLeft(), half=Math.round(reserveTotal()/2);
+  var rows=[[-10,'觸發預備金第 1 批加碼（規劃 '+fmt(half)+'）'],[-20,'觸發預備金第 2 批加碼'],[-30,'超出規劃——只用閒錢，不融資，等回升']];
+  el.innerHTML=rows.map(function(o){ var pc=o[0], nv=Math.round(val*(1+pc/100)), loss=Math.round(val*pc/100);
+    return '<div class="kv"><span class="k">大盤 '+pc+'%</span><span class="v num">市值約 '+fmt(nv)+'（'+fmt(loss)+'）</span></div><p class="note" style="margin:2px 0 8px">'+o[1]+'</p>'; }).join('')+
+    '<div class="kv" style="margin-top:4px"><span class="k">手上子彈（現金＋預備金）</span><span class="v num">'+fmt(Math.round(cash+res))+'</span></div>'+
+    '<p class="note" style="margin-top:6px">MJ：跌深不是風險，沒現金才是——比氣長。</p>';
+}
+// ── 每日損益月曆熱圖 ──
+var heatYM=null;
+function renderHeat(){
+  var grid=document.getElementById('heatGrid'), card=document.getElementById('heatCard'); if(!grid||!card) return;
+  var arr=dailyValueSeries();
+  if(!arr||arr.length<3){ card.style.display='none'; return; }
+  card.style.display='';
+  var pnl={};
+  for(var i=1;i<arr.length;i++){ pnl[arr[i].d]=(arr[i].v-arr[i-1].v)-(arr[i].c-arr[i-1].c); }
+  var minYM=arr[1].d.slice(0,7), maxYM=dstr(0).slice(0,7);
+  if(!heatYM) heatYM=maxYM;
+  if(heatYM<minYM) heatYM=minYM; if(heatYM>maxYM) heatYM=maxYM;
+  document.getElementById('heatLabel').textContent=heatYM.replace('-','/');
+  document.getElementById('heatPrev').disabled=heatYM<=minYM;
+  document.getElementById('heatNext').disabled=heatYM>=maxYM;
+  var y=+heatYM.slice(0,4), m=+heatYM.slice(5,7);
+  var days=new Date(y,m,0).getDate(), startW=(new Date(y,m-1,1).getDay()+6)%7;
+  var mxAbs=0, d2, k;
+  for(d2=1;d2<=days;d2++){ k=heatYM+'-'+String(d2).padStart(2,'0'); if(pnl[k]!=null) mxAbs=Math.max(mxAbs,Math.abs(pnl[k])); }
+  var h='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;font-size:11px;color:var(--muted);text-align:center">'+['一','二','三','四','五','六','日'].map(function(w){return '<span>'+w+'</span>';}).join('')+'</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:4px">';
+  for(var b=0;b<startW;b++) h+='<span></span>';
+  for(d2=1;d2<=days;d2++){
+    k=heatYM+'-'+String(d2).padStart(2,'0');
+    var p=pnl[k], style='background:var(--paper);color:var(--muted)', sub='';
+    if(p!=null&&mxAbs>0){
+      var al=(0.13+0.57*Math.min(1,Math.abs(p)/mxAbs)).toFixed(2);
+      style='background:rgba('+(p>=0?'200,49,43':'31,138,76')+','+al+');color:'+((Math.abs(p)/mxAbs)>0.55?'#fff':'var(--ink)');
+      var av=Math.abs(Math.round(p));
+      sub='<div style="font-size:8.5px;line-height:1.2;opacity:.9">'+(p>=0?'+':'−')+(av>=10000?(Math.round(av/1000)+'k'):fmt(av))+'</div>';
+    }
+    h+='<div class="num" style="border-radius:7px;padding:5px 0 4px;text-align:center;font-size:12px;'+style+'">'+d2+sub+'</div>';
+  }
+  h+='</div><p class="note" style="margin:8px 0 0">格子＝那天收盤的損益變化（紅賺綠虧、越深越大）；空白＝非交易日或尚無資料。</p>';
+  grid.innerHTML=h;
+}
+(function(){ var p=document.getElementById('heatPrev'), n=document.getElementById('heatNext');
+  function shift(dm){ var y=+heatYM.slice(0,4), m=+heatYM.slice(5,7)-1+dm, d=new Date(y,m,1); heatYM=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); renderHeat(); }
+  if(p) p.onclick=function(){ shift(-1); }; if(n) n.onclick=function(){ shift(1); };
+})();
 function render(){
   document.getElementById('updDate').textContent=state.updated||'—';
   (function(){ var hu=document.getElementById('hUpd'); if(!hu)return;
@@ -1788,6 +1910,11 @@ function render(){
   renderAutoDca();
   renderAdd();
   renderSale();
+  renderDivNotice();
+  renderBak();
+  renderProj();
+  renderStress();
+  renderHeat();
 }
 
 // add tx
@@ -2483,10 +2610,12 @@ document.getElementById('pfSave').onclick=function(){
 };
 
 // tools
-document.getElementById('expBtn').onclick=()=>{
+function doExport(){
   const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='投資追蹤備份.json'; a.click(); URL.revokeObjectURL(a.href);
-};
+  state.lastBackup=dstr(0); save(); render();
+}
+document.getElementById('expBtn').onclick=doExport;
 document.getElementById('impBtn').onclick=()=>document.getElementById('impFile').click();
 document.getElementById('impFile').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{state=normalize(JSON.parse(r.result)); save(); render(); alert('已匯入');}catch(x){alert('檔案格式不對');} }; r.readAsText(f); };
 
@@ -2900,6 +3029,7 @@ function fetchAutoPrices(done){
         if(e.d&&e.d>latest) latest=e.d;
       });
       // 歷史日收盤併入 priceHist（走勢圖、近3月高低、加碼判讀都靠它）
+      if(j.divs && JSON.stringify(j.divs)!==JSON.stringify(state.divs||{})){ state.divs=j.divs; changed=true; }
       if(j.hist){
         if(!state.priceHist) state.priceHist={};
         var cs=dstr(-130);
