@@ -24,6 +24,7 @@ body{
   font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
   background:var(--paper); color:var(--ink); line-height:1.5;
   -webkit-font-smoothing:antialiased; padding-bottom:84px;
+  min-height:100vh; /* 每一頁都至少可捲動：iOS 對捲不動的頁會縮小視窗，nav 就浮高（記錄/配置頁的毛病） */
 }
 .num{font-variant-numeric:tabular-nums; letter-spacing:.2px}
 header{
@@ -951,7 +952,7 @@ nav button.on .ic{transform:translateY(-1px)}
         <p class="note" style="margin:8px 0 0">依你記錄的持倉、現金與計畫自動判斷，為 MJ老師公開教學心法的整理與自我對照，非投資建議。</p>
       </div>
     </div>
-    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v102</p>
+    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v103</p>
   </section>
 
   <!-- 交割 -->
@@ -2763,6 +2764,8 @@ function fetchAutoPrices(){
 load(); autoBookDca(); render();
 fetchAutoPrices();
 document.addEventListener('visibilitychange',function(){ if(!document.hidden) fetchAutoPrices(); });
+// iOS 主畫面 App：把文件高度撐過整個螢幕，四個分頁的視窗高度才會一致、nav 全部貼底
+if(window.navigator.standalone && screen.height){ document.body.style.minHeight=(screen.height+12)+'px'; }
 // 版本字樣連點三下：顯示版面診斷數據（除錯用）
 (function(){
   var v=document.getElementById('verTag'); if(!v) return;
