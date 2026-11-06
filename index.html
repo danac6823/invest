@@ -149,6 +149,8 @@ input.px:focus{outline:2px solid var(--ink2); outline-offset:1px; border-color:v
 .cashrow .ct.deposit{background:rgba(31,56,100,.10); color:var(--ink2)}
 .cashrow .ct.dividend{background:rgba(45,130,90,.14); color:#1f7a52}
 .cashrow .ct.withdraw{background:rgba(200,49,43,.10); color:var(--up)}
+.cashrow .ct.buy,.cashrow .ct.dca{background:rgba(110,120,135,.12); color:var(--muted)}
+.cashrow .ct.sell{background:rgba(45,130,90,.14); color:#1f7a52}
 .cashrow .cd{color:var(--muted); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .cashrow .ca{margin-left:auto; font-weight:600; flex:none}
 .cashbig{font-size:30px; font-weight:700; color:var(--ink); line-height:1.05; font-variant-numeric:tabular-nums}
@@ -952,7 +954,7 @@ nav button.on .ic{transform:translateY(-1px)}
         <p class="note" style="margin:8px 0 0">依你記錄的持倉、現金與計畫自動判斷，為 MJ老師公開教學心法的整理與自我對照，非投資建議。</p>
       </div>
     </div>
-    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v106</p>
+    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v107</p>
   </section>
 
   <!-- 交割 -->
@@ -2125,11 +2127,22 @@ document.getElementById('wfSave').onclick=function(){
 };
 function renderCash(){
   var el=document.getElementById('cashList'); if(!el) return;
-  var TY={deposit:'入金',dividend:'股利',withdraw:'出金'};
-  var list=(state.cashTx||[]).map(function(c,i){return {c:c,i:i};}).sort(function(A,B){ var a=A.c.date||'',b=B.c.date||''; return a<b?1:(a>b?-1:B.i-A.i); });
+  var TY={deposit:'入金',dividend:'股利',withdraw:'出金',buy:'買進',dca:'定期',sell:'賣出'};
+  var list=(state.cashTx||[]).map(function(c,i){return {c:c,i:i};});
+  // 買賣交易的自動扣款／入帳也列進明細（餘額本來就有計入，這裡只是讓它看得見）
+  (state.tx||[]).forEach(function(t){
+    var sh=Number(t.sh)||0, px=Number(t.px)||0; if(!t.code||!sh) return;
+    var fee=txFee(t), cat=t.cat||meta(t.code).cat, amt=sh*px, isSell=t.kind==='sell';
+    list.push({auto:true, c:{type:isSell?'sell':(t.kind==='dca'?'dca':'buy'), amount:isSell?(amt-fee-sellTax(cat,amt)):(amt+fee), date:t.date||'', note:(t.name||meta(t.code).name||t.code)+' '+shStr(t.code,sh)+' '+unitWord(t.code)}});
+  });
+  list.sort(function(A,B){ var a=A.c.date||'',b=B.c.date||''; return a<b?1:(a>b?-1:0); });
   if(!list.length){ el.innerHTML='<p class="note" style="margin:0">還沒有現金紀錄。先記一筆「入金」當本金。</p>'; return; }
-  el.innerHTML=list.map(function(o){ var c=o.c, sign=c.type==='withdraw'?'−':'+'; return '<div class="cashrow"><span class="ct '+c.type+'">'+TY[c.type]+'</span><span class="cd">'+(c.date||'—')+(c.note?' · '+c.note:'')+'</span><span class="ca num">'+sign+fmt(Number(c.amount)||0)+'</span><button class="del" data-i="'+o.i+'">✕</button></div>'; }).join('');
+  var LIMIT=10, more=list.length>LIMIT;
+  var show=(cashExpanded||!more)?list:list.slice(0,LIMIT);
+  el.innerHTML=show.map(function(o){ var c=o.c, neg=(c.type==='withdraw'||c.type==='buy'||c.type==='dca'), sign=neg?'−':'+'; return '<div class="cashrow"><span class="ct '+c.type+'">'+TY[c.type]+'</span><span class="cd">'+(c.date||'—')+(c.note?' · '+c.note:'')+'</span><span class="ca num">'+sign+fmt(Math.round(Number(c.amount)||0))+'</span>'+(o.auto?'':'<button class="del" data-i="'+o.i+'">✕</button>')+'</div>'; }).join('')
+    + (more?'<button class="cashmore" id="cashMore">'+(cashExpanded?'收合明細':'顯示全部 '+list.length+' 筆')+'</button>':'');
   el.querySelectorAll('.del').forEach(function(b){ b.onclick=function(){ if(confirm('刪除這筆？')){ state.cashTx.splice(+b.dataset.i,1); save(); render(); } }; });
+  var mb=document.getElementById('cashMore'); if(mb) mb.onclick=function(){ cashExpanded=!cashExpanded; renderCash(); };
 }
 function openCashForm(){ var d=new Date(); document.getElementById('cfType').selectedIndex=0; document.getElementById('cfAmt').value=''; document.getElementById('cfNote').value=''; document.getElementById('cfDate').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); document.getElementById('cashForm').style.display='block'; }
 document.getElementById('addCashBtn').onclick=openCashForm;
