@@ -12,9 +12,9 @@
 <title>豐盛之路</title>
 <style>
 :root{
-  --ink:#3A2F10; --ink2:#5C4A17; --paper:#F6F1E3; --card:#FFFFFF;
+  --ink:#3A2C0C; --ink2:#705713; --paper:#FAF0D9; --card:#FFFDF6;
   --brand:#E5A118; --brand2:#D97E06; --onb:#4A2E00; --onb2:rgba(74,46,0,.62);
-  --line:#E3DBC4; --muted:#857A5C; --gold:#A8842C;
+  --line:#EBDDB6; --muted:#8D7342; --gold:#BE8A14;
   --up:#C8312B; --down:#1F8A4C;
   --c-stock:#7A5C9E; --c-tw:#B8893A; --c-us:#2F6E8F;
   --r:14px; --sh:0 1px 3px rgba(58,47,16,.08), 0 6px 18px rgba(58,47,16,.05);
@@ -966,7 +966,7 @@ nav button.on .ic{transform:translateY(-1px)}
         <p class="note" style="margin:8px 0 0">依你記錄的持倉、現金與計畫自動判斷，為 MJ老師公開教學心法的整理與自我對照，非投資建議。</p>
       </div>
     </div>
-    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v112</p>
+    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v113</p>
   </section>
 
   <!-- 交割 -->
@@ -2511,6 +2511,7 @@ function switchTab(name){
 }
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
 
+var SPLITS={'5904':{d:'2026-08-10',t:'1拆10'}}; // 股票分割：圖上畫分割線；該檔分割前歷史價已換算為分割後基準
 function lbChart(code, h){
   var arr=((state.priceHist&&state.priceHist[code])||[]).filter(function(x){return Number(x.p)>0;});
   if(arr.length<2) return '';
@@ -2533,6 +2534,16 @@ function lbChart(code, h){
     dots+='<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(px).toFixed(1)+'" r="3.6" fill="var(--'+(t.kind==='sell'?'down':'up')+')" stroke="#fff" stroke-width="1.2"/>';
   });
   var avgLine=showAvg?('<line x1="'+P+'" x2="'+(W-P)+'" y1="'+Y(avg).toFixed(1)+'" y2="'+Y(avg).toFixed(1)+'" stroke="var(--gold)" stroke-dasharray="5 4" stroke-width="1.2"/>'):'';
+  var sp=SPLITS[code], spSvg='', spNote='';
+  if(sp){
+    var si=arr.findIndex(function(x){return x.d>=sp.d;});
+    if(si>0){
+      var sx=X(si).toFixed(1);
+      spSvg='<line x1="'+sx+'" x2="'+sx+'" y1="'+P+'" y2="'+(H-P)+'" stroke="var(--c-stock)" stroke-dasharray="3 3" stroke-width="1.1"/>'+
+        '<text x="'+(X(si)+4).toFixed(1)+'" y="'+(P+11)+'" font-size="9.5" font-weight="700" fill="var(--c-stock)">'+sp.t+'分割</text>';
+      spNote='<div class="tline" style="margin-top:4px;color:var(--c-stock)">┆ '+sp.d.replace(/^\d{4}-(\d{2})-(\d{2})/,'$1/$2')+' '+sp.t+'分割——線左側股價已換算成分割後基準，可直接比較。</div>';
+    }
+  }
   var md=function(s){return (s||'').replace(/^\d{4}-(\d{2})-(\d{2})/,'$1/$2');};
   var chips='';
   var r=range3m(code,h.px);
@@ -2544,8 +2555,8 @@ function lbChart(code, h){
     '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;display:block;background:var(--paper);border-radius:10px">'+
       '<text x="'+(P+2)+'" y="13" font-size="9.5" fill="var(--muted)">'+fmt2(hi)+'</text>'+
       '<text x="'+(P+2)+'" y="'+(H-4)+'" font-size="9.5" fill="var(--muted)">'+fmt2(lo)+'</text>'+
-      avgLine+'<path d="'+line+'" fill="none" stroke="var(--ink2)" stroke-width="1.6"/>'+dots+'</svg>'+
-    '<div class="tline" style="margin-top:6px"><span style="color:var(--up)">●</span> 買　<span style="color:var(--down)">●</span> 賣　<span style="color:var(--gold)">┄</span> 含費均價 '+fmt2(avg)+(out?'　<small>（'+out+' 筆在圖外）</small>':'')+'</div>'+chips;
+      spSvg+avgLine+'<path d="'+line+'" fill="none" stroke="var(--ink2)" stroke-width="1.6"/>'+dots+'</svg>'+
+    '<div class="tline" style="margin-top:6px"><span style="color:var(--up)">●</span> 買　<span style="color:var(--down)">●</span> 賣　<span style="color:var(--gold)">┄</span> 含費均價 '+fmt2(avg)+(out?'　<small>（'+out+' 筆在圖外）</small>':'')+'</div>'+spNote+chips;
 }
 function openLightbox(code){
   var h=holdings().find(function(x){return x.code===code;});
