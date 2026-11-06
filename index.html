@@ -19,11 +19,12 @@
   --r:14px; --sh:0 1px 3px rgba(58,47,16,.08), 0 6px 18px rgba(58,47,16,.05);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;padding:0}
+html,body{margin:0;padding:0;height:100%}
 body{
   font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
   background:var(--paper); color:var(--ink); line-height:1.5;
-  -webkit-font-smoothing:antialiased; padding-bottom:84px;
+  -webkit-font-smoothing:antialiased;
+  display:flex; flex-direction:column; overflow:hidden; /* App 殼：body 不捲動，main 自己捲，nav 永遠置底 */
 }
 .num{font-variant-numeric:tabular-nums; letter-spacing:.2px}
 header{
@@ -35,7 +36,7 @@ header{
 header .brand{font-size:19px; font-weight:700; letter-spacing:1px}
 header .brand small{display:block; font-size:11px; font-weight:400; letter-spacing:3px; color:#C2B389; margin-top:2px}
 header .upd{font-size:12px; color:#CBBD93; text-align:right}
-main{max-width:560px; margin:0 auto; padding:16px}
+main{flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; width:100%; max-width:560px; margin:0 auto; padding:16px 16px 28px}
 section{display:none; animation:fade .25s ease}
 section.on{display:block}
 @keyframes fade{from{opacity:0; transform:translateY(4px)}to{opacity:1; transform:none}}
@@ -500,7 +501,7 @@ button.btn.ghost{background:transparent; color:var(--ink); border:1px solid var(
 .tools button{flex:1}
 
 /* tab bar */
-nav{position:fixed; bottom:0; left:0; right:0; z-index:30; background:rgba(255,255,255,.96); backdrop-filter:blur(10px); border-top:1px solid var(--line); display:flex; padding-bottom:env(safe-area-inset-bottom)}
+nav{flex:none; z-index:30; background:rgba(255,255,255,.96); backdrop-filter:blur(10px); border-top:1px solid var(--line); display:flex; padding-bottom:env(safe-area-inset-bottom)}
 nav button{flex:1; border:0; background:none; padding:9px 0 8px; color:var(--muted); font-size:11.5px; font-family:inherit; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:3px}
 nav button .ic{font-size:19px; line-height:1}
 nav button.on{color:var(--ink)}
@@ -1041,8 +1042,9 @@ nav button.on .ic{transform:translateY(-1px)}
 <div class="lb" id="slipModal">
   <div class="lbsheet">
     <div class="lbtop"><div class="lbnm">貼交割憑單<small>把成交通知整封複製貼上，自動入帳</small></div><button class="lbclose" id="slipX">✕</button></div>
-    <textarea id="slipBox" rows="6" placeholder="打開券商「成交資料／交割憑單」通知 email，全選複製，貼在這裡" style="width:100%;margin-top:8px;border:1px solid var(--line);border-radius:9px;padding:9px;font-family:inherit;font-size:13px;resize:vertical;color:var(--ink);background:var(--paper)"></textarea>
-    <div class="tools" style="margin-top:8px"><button class="btn" id="slipParse">解析 ↓</button></div>
+    <textarea id="slipBox" rows="6" placeholder="打開券商「成交資料／交割憑單」通知 email，全選複製，貼在這裡；或直接按下面「傳截圖」" style="width:100%;margin-top:8px;border:1px solid var(--line);border-radius:9px;padding:9px;font-family:inherit;font-size:13px;resize:vertical;color:var(--ink);background:var(--paper)"></textarea>
+    <div class="tools" style="margin-top:8px"><button class="btn" id="slipParse">解析 ↓</button><button class="btn ghost" id="slipPhoto">📷 傳截圖辨識</button></div>
+    <input type="file" id="slipFile" accept="image/*" style="display:none">
     <p class="note" id="slipStatus" style="margin:7px 0 0">支援台新證券「成交資料」通知（現買／現賣）。手續費會直接帶入實際金額。</p>
     <div id="slipList" style="margin-top:8px"></div>
     <div class="tools" style="margin-top:14px"><button class="btn" id="slipImport" style="display:none">匯入勾選的交易</button><button class="btn ghost" id="slipCancel">取消</button></div>
@@ -2074,16 +2076,16 @@ function fillSettings(){
 function openSettings(){ fillSettings(); var m=document.getElementById('setModal'); m.classList.add('on'); document.body.style.overflow='hidden'; }
 function closeSettings(){ document.getElementById('setModal').classList.remove('on'); document.body.style.overflow=''; render(); }
 document.getElementById('gearBtn').onclick=openSettings;
-document.getElementById('learnBtn').onclick=function(){ switchTab('learn'); window.scrollTo(0,0); };
+document.getElementById('learnBtn').onclick=function(){ switchTab('learn'); mainScrollTop(); };
 function goCard(dest){
   if(dest==='modal:add'){ openQuick('add'); return; }
   if(dest==='modal:plan'){ openQuick('plan'); return; }
   if(dest==='modal:price'){ openPriceModal(); return; }
   if(dest==='alloc:addCard'){ openAddModal(false); return; }
   if(dest==='alloc:resCard'){ openAddModal(true); return; }
-  if(dest==='cash:addCash'){ switchTab('cash'); window.scrollTo(0,0); var cf=document.getElementById('cashForm'), cb=document.getElementById('addCashBtn'); if(cf&&cb&&cf.style.display==='none') cb.click(); return; }
+  if(dest==='cash:addCash'){ switchTab('cash'); mainScrollTop(); var cf=document.getElementById('cashForm'), cb=document.getElementById('addCashBtn'); if(cf&&cb&&cf.style.display==='none') cb.click(); return; }
   var parts=dest.split(':'), tab=parts[0], tgt=parts[1];
-  switchTab(tab); window.scrollTo(0,0);
+  switchTab(tab); mainScrollTop();
   if(!tgt) return;
   if(tgt==='addOpen'){ txSegShow('add'); tgt='addToggle'; }
   else if(tgt==='planOpen'){ txSegShow('plan'); tgt='planToggle'; }
@@ -2381,12 +2383,13 @@ document.getElementById('impBtn').onclick=()=>document.getElementById('impFile')
 document.getElementById('impFile').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ try{state=normalize(JSON.parse(r.result)); save(); render(); alert('已匯入');}catch(x){alert('檔案格式不對');} }; r.readAsText(f); };
 
 // tabs
+function mainScrollTop(){ var m=document.querySelector('main'); if(m) m.scrollTop=0; }
 function switchTab(name){
   if(name==='cash'||name==='learn') name='home'; // 交割/學習已併入「更多」
   var show = name==='home' ? ['tab-home','tab-learn'] : ['tab-'+name];
   document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',show.indexOf(s.id)>=0));
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===name));
-  window.scrollTo({top:0,behavior:'instant'});
+  mainScrollTop();
   if(name==='alloc'){ var al=document.getElementById('addList'); if(al&&typeof fitRows==='function') fitRows(al); }
 }
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
@@ -2431,14 +2434,15 @@ function slipCodeOf(name){
   var nn=nq_(name).replace(/\s/g,'');
   if(!nn) return '';
   if(SLIP_ALIAS[nn]) return SLIP_ALIAS[nn];
-  for(var k in SLIP_ALIAS){ if(nn.indexOf(nq_(k))>=0) return SLIP_ALIAS[k]; }
+  for(var k in SLIP_ALIAS){ var kk=nq_(k); if(nn.indexOf(kk)>=0 || (nn.length>=2&&kk.indexOf(nn)>=0)) return SLIP_ALIAS[k]; }
   var mc=mergedCatalog();
   if(mc[nn]) return nn; // 直接貼代號
   for(var c in mc){ var nm=nq_(mc[c].name||'').replace(/\s/g,''); if(nm&&(nm===nn||nm.indexOf(nn)>=0||nn.indexOf(nm)>=0)) return c; }
   return '';
 }
 function parseSlip(text){
-  text=String(text||'');
+  text=String(text||'').replace(/[！-～]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-0xFEE0);}).replace(/　/g,' '); // 全形轉半形
+  text=text.replace(/([一-鿿])[ \t]+(?=[一-鿿])/g,'$1'); // OCR 常把中文逐字隔開：併回去
   // 日期：民國 115 年 11 月 5 日，或 2026/11/05
   var date='', m=text.match(/(\d{2,4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
   if(m){ var y=+m[1]; if(y<1911)y+=1911; date=y+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0'); }
@@ -2448,8 +2452,12 @@ function parseSlip(text){
   var isNum=function(s){ return /^-?\d{1,3}(,\d{3})*(\.\d+)?$|^-?\d+(\.\d+)?$/.test(s); };
   var rows=[];
   for(var i=0;i<toks.length;i++){
-    var kind=KINDS[toks[i]]; if(!kind) continue;
-    var j=i+1, name='';
+    var kind=KINDS[toks[i]], rem='';
+    if(!kind){ // OCR 併字後「現買台灣50」黏成一個 token：拆出開頭的類別詞
+      for(var kk in KINDS){ if(toks[i].length>kk.length && toks[i].indexOf(kk)===0){ kind=KINDS[kk]; rem=toks[i].slice(kk.length); break; } }
+    }
+    if(!kind) continue;
+    var j=i+1, name=rem;
     while(j<toks.length && !isNum(toks[j]) && !KINDS[toks[j]]){ name+=toks[j]; j++; }
     var nums=[];
     while(j<toks.length && !KINDS[toks[j]]){
@@ -2460,11 +2468,13 @@ function parseSlip(text){
     i=j-1;
     if(!name||nums.length<3) continue;
     // 欄位：數量 [現沖] 成交價 價金 手續費 交易稅 …；用「價金≈數量×成交價」對位
-    var sh=nums[0], px=null, fee=0, tax=0;
-    var near=function(a,b){ return Math.abs(a-b)<=Math.max(2, a*0.005); };
-    if(nums.length>=4 && near(sh*nums[2], nums[3])){ px=nums[2]; fee=nums[4]||0; tax=nums[5]||0; }
-    else if(near(sh*nums[1], nums[2])){ px=nums[1]; fee=nums[3]||0; tax=nums[4]||0; }
-    if(!(sh>0)||!(px>0)) continue;
+    // OCR 可能把名稱裡的數字（台灣「50」）或現沖欄弄歪，所以在前幾個位置掃描對位
+    var near=function(a,b){ return Math.abs(a-b)<=Math.max(2, a*0.01); };
+    var sh=null, px=null, fee=0, tax=0, found=false;
+    var tryAt=function(qi,pi){ var q=nums[qi], p=nums[pi], a=nums[pi+1]; if(q>=1&&p>0&&a>0&&near(q*p,a)){ sh=q; px=p; fee=nums[pi+2]||0; tax=nums[pi+3]||0; found=true; } return found; };
+    tryAt(0,2) || tryAt(0,1); // 標準：數量 現沖 成交價 價金／數量 成交價 價金
+    if(!found){ for(var qi=0; qi<=2&&!found; qi++){ for(var pi=qi+1; pi<=qi+2&&pi+1<nums.length&&!found; pi++){ tryAt(qi,pi); } } }
+    if(!found) continue;
     rows.push({kind:kind, name:name, code:slipCodeOf(name), sh:sh, px:px, fee:fee, tax:tax, date:date});
   }
   return rows;
@@ -2507,12 +2517,41 @@ document.getElementById('slipCancel').onclick=closeSlip;
 (function(){ var m=document.getElementById('slipModal'); if(m) m.onclick=function(e){ if(e.target===m) closeSlip(); }; })();
 document.getElementById('slipParse').onclick=function(){
   var t=document.getElementById('slipBox').value, st=document.getElementById('slipStatus');
-  if(!t.trim()){ st.textContent='先把成交通知的內容貼進上面的框。'; return; }
+  if(!t.trim()){ st.textContent='先把成交通知的內容貼進上面的框，或按「📷 傳截圖辨識」。'; return; }
   slipRows=parseSlip(t);
-  if(!slipRows.length){ st.textContent='沒有解析到交易——確認貼的是含「現買／現賣＋數量＋成交價」的整封通知。'; renderSlipList(); return; }
+  if(!slipRows.length){ st.textContent='沒有解析到交易——要有「現買／現賣＋數量＋成交價」才認得。整封 email 全選複製再貼，或改按「📷 傳截圖辨識」。'; renderSlipList(); return; }
   var unk=slipRows.filter(function(r){return !r.code;}).length;
   st.textContent='✓ 解析到 '+slipRows.length+' 筆'+(unk?('，其中 '+unk+' 筆請先選標的'):'')+'，勾選後按「匯入」。';
   renderSlipList();
+};
+// 截圖 OCR：上傳成交通知截圖，辨識文字後走同一套解析
+document.getElementById('slipPhoto').onclick=function(){ document.getElementById('slipFile').click(); };
+document.getElementById('slipFile').onchange=function(e){
+  var f=e.target.files&&e.target.files[0]; e.target.value=''; if(!f) return;
+  var st=document.getElementById('slipStatus');
+  var run=function(){
+    st.textContent='🔍 辨識截圖中…（第一次使用會下載中文辨識模型，約 10～30 秒，請稍候）';
+    Tesseract.createWorker(['chi_tra','eng']).then(function(worker){
+      return worker.recognize(f).then(function(out){ worker.terminate(); return out; });
+    }).then(function(out){
+      var txt=(out&&out.data&&out.data.text)||'';
+      document.getElementById('slipBox').value=txt;
+      slipRows=parseSlip(txt);
+      if(!slipRows.length){ st.textContent='辨識完成，但沒解析到交易——看一下框裡辨識出的文字，手動修正錯字後再按「解析 ↓」。'; renderSlipList(); return; }
+      var unk=slipRows.filter(function(r){return !r.code;}).length;
+      st.textContent='✓ 截圖辨識＋解析到 '+slipRows.length+' 筆'+(unk?('，其中 '+unk+' 筆請先選標的'):'')+'。數字可能有辨識誤差，匯入前請核對。';
+      renderSlipList();
+    }).catch(function(err){
+      st.textContent='截圖辨識失敗（'+((err&&err.message)||err)+'）。備案：長按截圖用「選取文字」全選拷貝，貼進上面的框再解析。';
+    });
+  };
+  if(window.Tesseract){ run(); return; }
+  st.textContent='⏳ 載入辨識引擎…';
+  var s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js';
+  s.onload=run;
+  s.onerror=function(){ st.textContent='辨識引擎載入失敗（需要網路）。備案：長按截圖用「選取文字」全選拷貝，貼進上面的框再解析。'; };
+  document.head.appendChild(s);
 };
 document.getElementById('slipImport').onclick=function(){
   var n=0, fixed=0, skip=[];
