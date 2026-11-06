@@ -965,7 +965,7 @@ nav button.on .ic{transform:translateY(-1px)}
         <p class="note" style="margin:8px 0 0">依你記錄的持倉、現金與計畫自動判斷，為 MJ老師公開教學心法的整理與自我對照，非投資建議。</p>
       </div>
     </div>
-    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v110</p>
+    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v111</p>
   </section>
 
   <!-- 交割 -->
@@ -1042,7 +1042,9 @@ nav button.on .ic{transform:translateY(-1px)}
 <div class="lb" id="priceModal">
   <div class="lbsheet">
     <div class="lbtop"><div class="lbnm">集中報價更新<small>一次更新所有持倉的現價／淨值</small></div><button class="lbclose" id="priceX">✕</button></div>
-    <details class="hint" id="pastePanel" open style="margin:6px 0 12px">
+    <button class="btn" id="autoPxBtn" style="width:100%;margin:6px 0 4px">⚡ 自動帶入最新收盤價</button>
+    <p class="note" id="autoPxStatus" style="margin:0 0 10px">抓雲端最新收盤（每個交易日自動更新三次），台股／VOO／基金一次帶齊。</p>
+    <details class="hint" id="pastePanel" style="margin:6px 0 12px">
       <summary>📷 貼上截圖文字，自動填價</summary>
       <textarea id="pasteBox" rows="3" placeholder="在券商「截圖」上用 iPhone 實況文字選取 → 拷貝，貼在這裡" style="width:100%;margin-top:8px;border:1px solid var(--line);border-radius:9px;padding:9px;font-family:inherit;font-size:13px;resize:vertical;color:var(--ink);background:var(--paper)"></textarea>
       <div class="tools" style="margin-top:8px"><button class="btn" id="pasteParse">解析填入 ↓</button></div>
@@ -2216,6 +2218,8 @@ function openPriceModal(){
   var pp=document.getElementById('pastePanel'); if(pp) pp.style.display=held.length?'':'none';
   var pb=document.getElementById('pasteBox'); if(pb) pb.value='';
   var ps=document.getElementById('pasteStatus'); if(ps) ps.textContent='貼上後按「解析填入」，會依名稱自動對應到下面各檔；再往下檢查、儲存。';
+  var as=document.getElementById('autoPxStatus'); if(as) as.textContent='抓雲端最新收盤（每個交易日自動更新三次），台股／VOO／基金一次帶齊。';
+  var ab=document.getElementById('autoPxBtn'); if(ab){ ab.disabled=false; ab.textContent='⚡ 自動帶入最新收盤價'; ab.style.display=held.length?'':'none'; }
   document.getElementById('priceModal').classList.add('on'); document.body.style.overflow='hidden';
 }
 function nq_(s){ return (s||'').replace(/＆/g,'&').replace(/[！-～]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-0xFEE0);}).replace(/　/g,' ').replace(/\s+/g,' ').toUpperCase(); }
@@ -2506,6 +2510,42 @@ function switchTab(name){
 }
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
 
+function lbChart(code, h){
+  var arr=((state.priceHist&&state.priceHist[code])||[]).filter(function(x){return Number(x.p)>0;});
+  if(arr.length<2) return '';
+  var W=340,H=118,P=8;
+  var ps=arr.map(function(x){return Number(x.p);});
+  var lo=Math.min.apply(null,ps), hi=Math.max.apply(null,ps);
+  var avg=Number(h.avg)||0, showAvg=avg>lo*0.55&&avg<hi*1.45;
+  if(showAvg){ lo=Math.min(lo,avg); hi=Math.max(hi,avg); }
+  if(hi<=lo) hi=lo*1.01+0.01;
+  var X=function(i){return P+(W-2*P)*i/(arr.length-1);};
+  var Y=function(p){return H-P-(H-2*P)*(p-lo)/(hi-lo);};
+  var line=arr.map(function(x,i){return (i?'L':'M')+X(i).toFixed(1)+' '+Y(Number(x.p)).toFixed(1);}).join('');
+  var dots='', out=0;
+  (state.tx||[]).forEach(function(t){
+    if(t.code!==code) return;
+    var px=Number(t.px)||0, d=t.date||'';
+    if(!(px>0)||!d) return;
+    if(d<arr[0].d||px<lo||px>hi){ out++; return; }
+    var i=arr.findIndex(function(x){return x.d>=d;}); if(i<0) i=arr.length-1;
+    dots+='<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(px).toFixed(1)+'" r="3.6" fill="var(--'+(t.kind==='sell'?'down':'up')+')" stroke="#fff" stroke-width="1.2"/>';
+  });
+  var avgLine=showAvg?('<line x1="'+P+'" x2="'+(W-P)+'" y1="'+Y(avg).toFixed(1)+'" y2="'+Y(avg).toFixed(1)+'" stroke="var(--gold)" stroke-dasharray="5 4" stroke-width="1.2"/>'):'';
+  var md=function(s){return (s||'').replace(/^\d{4}-(\d{2})-(\d{2})/,'$1/$2');};
+  var chips='';
+  var r=range3m(code,h.px);
+  if(r&&h.px>0&&r.hi>0&&r.lo>0){
+    var pos=(h.px-r.lo)/((r.hi-r.lo)||1);
+    chips='<div class="tline" style="margin-top:6px">近3月位置 <b>'+Math.round(pos*100)+'%</b> ・ 距高點 −'+((r.hi-h.px)/r.hi*100).toFixed(1)+'% ・ 距低點 +'+((h.px-r.lo)/r.lo*100).toFixed(1)+'%</div>';
+  }
+  return '<div class="lbsec">近 '+arr.length+' 個交易日走勢（'+md(arr[0].d)+' – '+md(arr[arr.length-1].d)+'）</div>'+
+    '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;display:block;background:var(--paper);border-radius:10px">'+
+      '<text x="'+(P+2)+'" y="13" font-size="9.5" fill="var(--muted)">'+fmt2(hi)+'</text>'+
+      '<text x="'+(P+2)+'" y="'+(H-4)+'" font-size="9.5" fill="var(--muted)">'+fmt2(lo)+'</text>'+
+      avgLine+'<path d="'+line+'" fill="none" stroke="var(--ink2)" stroke-width="1.6"/>'+dots+'</svg>'+
+    '<div class="tline" style="margin-top:6px"><span style="color:var(--up)">●</span> 買　<span style="color:var(--down)">●</span> 賣　<span style="color:var(--gold)">┄</span> 含費均價 '+fmt2(avg)+(out?'　<small>（'+out+' 筆在圖外）</small>':'')+'</div>'+chips;
+}
 function openLightbox(code){
   var h=holdings().find(function(x){return x.code===code;});
   if(!h){ return; }
@@ -2523,6 +2563,7 @@ function openLightbox(code){
   document.getElementById('lbSheet').innerHTML=
     '<div class="lbtop"><div class="lbnm">'+h.name+'<small>'+h.code+' · '+dispCatOf(h.code,h.cat)+'</small></div><button class="lbclose" id="lbX">✕</button></div>'+
     '<div class="lbval">'+fmt(h.val)+' <span style="font-size:15px;color:var(--muted)">NT$ 市值</span></div>'+
+    lbChart(code,h)+
     '<div class="lbstats">'+
       '<div class="s"><div class="k">'+(isFund(h.code)?'單位數':'股數')+'</div><div class="v">'+shStr(h.code,h.sh)+'</div></div>'+
       '<div class="s"><div class="k">'+(isFund(h.code)?'含費均淨值':'含費均價')+'</div><div class="v">'+fmt2(h.avg)+'</div></div>'+
@@ -2792,10 +2833,10 @@ function renderAutoDca(){
 }
 
 // ═══ 自動報價：讀 GitHub Actions 每日產出的 prices.json ═══
-function fetchAutoPrices(){
+function fetchAutoPrices(done){
   try{
     fetch('prices.json?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
-      if(!j||!j.prices||!state) return;
+      if(!j||!j.prices||!state){ if(done) done(null); return; }
       var latest='', changed=false;
       Object.keys(j.prices).forEach(function(code){
         var e=j.prices[code]||{}, p=Number(e.p);
@@ -2825,16 +2866,30 @@ function fetchAutoPrices(){
           state.priceHist[code]=cur.filter(function(x){ return x.d>=cs; });
         });
       }
-      if(!latest) return;
+      if(!latest){ if(done) done(null); return; }
       var prev=state.autoPx&&state.autoPx.d;
       state.autoPx={at:j.updated||'', d:latest};
       if(String(state.updated||'').replace(/\//g,'-')<latest) state.updated=latest.replace(/-/g,'/');
       var nb=autoBookDca();
       save();
       if(changed||prev!==latest||nb) render();
-    }).catch(function(){});
-  }catch(e){}
+      if(done) done(latest);
+    }).catch(function(){ if(done) done(null); });
+  }catch(e){ if(done) done(null); }
 }
+document.getElementById('autoPxBtn').onclick=function(){
+  var btn=this, st=document.getElementById('autoPxStatus');
+  btn.disabled=true; btn.textContent='抓取中…';
+  fetchAutoPrices(function(latest){
+    btn.disabled=false; btn.textContent='⚡ 自動帶入最新收盤價';
+    if(latest){
+      st.textContent='✓ 已帶入 '+latest.replace(/^\d{4}-/,'').replace('-','/')+' 收盤價，下面各欄已更新，不用再儲存。';
+      document.querySelectorAll('#priceList .pxe').forEach(function(inp){ var v=state.prices&&state.prices[inp.dataset.code]; if(v!=null) inp.value=v; });
+    } else {
+      st.textContent='✗ 抓不到（可能離線），可以用下方貼截圖文字或手動填。';
+    }
+  });
+};
 load(); autoBookDca(); render();
 fetchAutoPrices();
 document.addEventListener('visibilitychange',function(){ if(!document.hidden) fetchAutoPrices(); });

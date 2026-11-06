@@ -1,4 +1,4 @@
-const CACHE = 'invest-v110'; // 升版時同步改 index.html 頁尾的「豐盛之路 vXX」
+const CACHE = 'invest-v111'; // 升版時同步改 index.html 頁尾的「豐盛之路 vXX」
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-180.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
