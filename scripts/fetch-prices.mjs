@@ -72,6 +72,8 @@ const errors = [];
 const setPx = (code, p, d, src, extra) => {
   p = Number(p);
   if (!(p > 0)) return;
+  const old = prices[code];
+  if (old && old.d && d && d < old.d) return; // 資料源回吐舊日期時不要倒退（2026-11-09 TWSE openapi 塞住事件）
   prices[code] = Object.assign({ p, d: d || null, src }, extra || {});
 };
 
@@ -84,6 +86,27 @@ try {
     if (r && Number(r.ClosingPrice) > 0) setPx(code, r.ClosingPrice, rocToIso(r.Date), 'twse');
   }
 } catch (e) { errors.push('twse: ' + e.message); }
+
+// ── 1b. 上市備援（TWSE 盤後 MI_INDEX）：openapi 偶爾供舊檔（2026-11-09 整天停在前週五），
+//        改抓官方盤後整批收盤。非交易日/尚未發布會回 stat!=OK，靜默略過。
+try {
+  const todayTW = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
+  const stale = TW_CODES.some(c => prices[c] && prices[c].src === 'twse' && prices[c].d < todayTW);
+  if (stale) {
+    const j = await getJson(`https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date=${todayTW.replace(/-/g, '')}&type=ALLBUT0999&response=json`);
+    if (j && j.stat === 'OK') {
+      const tbl = (j.tables || []).find(t => t.fields && t.fields.includes('證券代號') && t.fields.includes('收盤價'));
+      if (tbl) {
+        const ci = tbl.fields.indexOf('收盤價');
+        const map = new Map(tbl.data.map(r => [r[0], r[ci]]));
+        for (const code of TW_CODES) {
+          const p = Number(String(map.get(code) || '').replace(/,/g, ''));
+          if (p > 0) setPx(code, p, todayTW, 'twse-mi');
+        }
+      }
+    }
+  }
+} catch (e) { errors.push('twse-mi: ' + e.message); }
 
 // ── 2. 台股上櫃（TPEx，補上市沒抓到的）───────────────
 try {
