@@ -737,7 +737,7 @@ nav button.on .ic{transform:translateY(-1px)}
       <div class="progtap" data-go="tx">
         <div class="pgtop"><p class="eyebrow" style="margin:0">📊 本月進度 · <span id="moLabel" class="num">—</span></p><span class="pgmsg" id="moBudgetMsg">—</span></div>
         <div class="mobar" style="margin:9px 0 8px"><div class="mobarfill" id="moBudgetFill"></div></div>
-        <div class="pgbot"><span>本月投入 <b class="num" id="moTotal">—</b></span><span>每月計畫 <b class="num" id="moPlan">—</b> <span class="ic4">›</span></span></div>
+        <div class="pgbot"><span id="moTglBtn" style="cursor:pointer"><span id="moTotalLbl">本月投入</span> <b class="num" id="moTotal">—</b> <span class="ic4">⇄</span></span><span>每月計畫 <b class="num" id="moPlan">—</b> <span class="ic4">›</span></span></div>
       </div>
       <div id="moChart"></div>
       <details class="hint" style="margin-top:11px"><summary>看本月明細</summary>
@@ -975,7 +975,7 @@ nav button.on .ic{transform:translateY(-1px)}
         <p class="note" style="margin:8px 0 0">依你記錄的持倉、現金與計畫自動判斷，為 MJ老師公開教學心法的整理與自我對照，非投資建議。</p>
       </div>
     </div>
-    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v117</p>
+    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v118</p>
   </section>
 
   <!-- 交割 -->
@@ -1296,23 +1296,30 @@ function renderMoChart(){
   var el=document.getElementById('moChart'); if(!el) return;
   var now=new Date(), months=[];
   for(var k=5;k>=0;k--){ var d=new Date(now.getFullYear(), now.getMonth()-k, 1); months.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); }
+  var net=!!state.moNet;
   var sums={}; months.forEach(function(m){ sums[m]=0; });
-  (state.tx||[]).forEach(function(t){ if(!t.date||t.kind==='sell')return; var m=t.date.slice(0,7); if(sums[m]==null)return; sums[m]+=(Number(t.sh)||0)*(Number(t.px)||0)+txFee(t); });
+  (state.tx||[]).forEach(function(t){
+    if(!t.date||!t.code)return; var m=t.date.slice(0,7); if(sums[m]==null)return;
+    var sh=Number(t.sh)||0, px=Number(t.px)||0; if(!sh)return; var amt=sh*px;
+    if(t.kind==='sell'){ if(net){ var cat=t.cat||meta(t.code).cat; sums[m]-=amt-txFee(t)-sellTax(cat,amt); } }
+    else sums[m]+=amt+txFee(t);
+  });
   var vals=months.map(function(m){ return sums[m]; });
-  if(!vals.some(function(v){return v>0;})){ el.innerHTML=''; return; }
+  if(!vals.some(function(v){return v!==0;})){ el.innerHTML=''; return; }
   var plan=monthlyTarget();
   var mxv=Math.max.apply(null, vals.concat([plan||0, 1]));
   var W=330,H=96,bw=W/6;
   var bars=months.map(function(m,i){
-    var v=vals[i], h=(H-26)*(v/mxv), x=i*bw+bw*0.18, y=H-14-h, cur=(i===5);
+    var v=vals[i], h=(H-26)*(Math.max(v,0)/mxv), x=i*bw+bw*0.18, y=H-14-h, cur=(i===5);
+    var lbl=Math.abs(v)>=10000?((Math.abs(v)/10000).toFixed(1).replace(/\.0$/,'')+'萬'):fmt(Math.round(Math.abs(v)));
     return '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+(bw*0.64).toFixed(1)+'" height="'+Math.max(h,1.5).toFixed(1)+'" rx="3" fill="var(--c-tw)" opacity="'+(cur?'1':'0.42')+'"/>'+
       '<text x="'+(i*bw+bw/2).toFixed(1)+'" y="'+(H-3)+'" font-size="9.5" text-anchor="middle" fill="var(--muted)">'+(+m.slice(5))+'月</text>'+
-      (v>0?'<text x="'+(i*bw+bw/2).toFixed(1)+'" y="'+Math.max(y-3,8).toFixed(1)+'" font-size="8.5" text-anchor="middle" fill="var(--muted)">'+(v>=10000?((v/10000).toFixed(1).replace(/\.0$/,'')+'萬'):fmt(Math.round(v)))+'</text>':'');
+      (v!==0?'<text x="'+(i*bw+bw/2).toFixed(1)+'" y="'+Math.max(y-3,8).toFixed(1)+'" font-size="8.5" text-anchor="middle" fill="var(--muted)">'+(v<0?'−':'')+lbl+'</text>':'');
   }).join('');
   var planLine='';
   if(plan>0){ var py=H-14-(H-26)*(plan/mxv); planLine='<line x1="0" y1="'+py.toFixed(1)+'" x2="'+W+'" y2="'+py.toFixed(1)+'" stroke="var(--muted)" stroke-width="1" stroke-dasharray="4 3" opacity=".65"/>'; }
   el.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;display:block;margin-top:10px">'+planLine+bars+'</svg>'+
-    '<div class="sparklbl"><span>近 6 個月投入</span>'+(plan>0?'<span>虛線＝每月計畫 '+fmt(plan)+'</span>':'')+'</div>';
+    '<div class="sparklbl"><span>'+(net?'近 6 個月淨投入（買進−賣出所得）':'近 6 個月投入')+'</span>'+(plan>0?'<span>虛線＝每月計畫 '+fmt(plan)+'</span>':'')+'</div>';
 }
 function smartBlock(code, price, sm){
   var html='', r=sm.r, ma=sm.ma;
@@ -1670,7 +1677,12 @@ function render(){
   document.getElementById('moLabel').textContent=(now.getMonth()+1)+' 月';
   document.getElementById('moDca').textContent=fmt(Math.round(moDca));
   document.getElementById('moSpot').textContent=fmt(Math.round(moSpotNorm));
-  document.getElementById('moTotal').textContent=fmt(Math.round(moTotal));
+  // 毛/淨投入切換：毛＝當月買進總額；淨＝買進 − 當月賣出所得（扣費稅）
+  var moNet=!!state.moNet, moShow=moNet?(moTotal-moSell):moTotal;
+  document.getElementById('moTotalLbl').textContent=moNet?'本月淨投入':'本月投入';
+  document.getElementById('moTotal').textContent=(moShow<0?'−':'')+fmt(Math.abs(Math.round(moShow)));
+  var moTgl=document.getElementById('moTglBtn');
+  if(moTgl&&!moTgl._b){ moTgl._b=1; moTgl.onclick=function(){ state.moNet=!state.moNet; save(); render(); }; }
   var moResAddRow=document.getElementById('moResAddRow');
   if(moSpotRes>0){ moResAddRow.style.display=''; document.getElementById('moResAdd').textContent=fmt(Math.round(moSpotRes)); } else { moResAddRow.style.display='none'; }
   var moSellRow=document.getElementById('moSellRow');
