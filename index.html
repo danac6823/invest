@@ -340,6 +340,8 @@ details.hint .note{margin:6px 0 0}
 .pgbot{display:flex; justify-content:space-between; align-items:baseline; font-size:13px; color:var(--muted)}
 .pgbot b{color:var(--ink); font-size:15px; font-variant-numeric:tabular-nums}
 .pgbot .ic4{color:var(--muted); opacity:.7; font-size:13px}
+.mopill{display:inline-flex;align-items:center;margin-left:4px;border:1px solid var(--line);background:var(--card);color:var(--ink2);font:inherit;font-size:11px;font-weight:700;border-radius:999px;padding:2.5px 9px;cursor:pointer;vertical-align:1px}
+.mopill.net{background:rgba(217,126,6,.13);border-color:var(--brand2);color:var(--brand2)}
 body.focus .delta{display:none}
 body.focus .pl{display:none}
 body.focus #hXirr{opacity:.55}
@@ -737,7 +739,8 @@ nav button.on .ic{transform:translateY(-1px)}
       <div class="progtap" data-go="tx">
         <div class="pgtop"><p class="eyebrow" style="margin:0">📊 本月進度 · <span id="moLabel" class="num">—</span></p><span class="pgmsg" id="moBudgetMsg">—</span></div>
         <div class="mobar" style="margin:9px 0 8px"><div class="mobarfill" id="moBudgetFill"></div></div>
-        <div class="pgbot"><span id="moTglBtn" style="cursor:pointer"><span id="moTotalLbl">本月投入</span> <b class="num" id="moTotal">—</b> <span class="ic4">⇄</span></span><span>每月計畫 <b class="num" id="moPlan">—</b> <span class="ic4">›</span></span></div>
+        <div class="pgbot"><span><span id="moTotalLbl">本月投入</span> <b class="num" id="moTotal">—</b> <button class="mopill" id="moTglBtn" type="button">⇄ 淨額</button></span><span>每月計畫 <b class="num" id="moPlan">—</b> <span class="ic4">›</span></span></div>
+        <div class="note num" id="moNetHint" style="display:none;margin:5px 0 0;font-size:11.5px"></div>
       </div>
       <div id="moChart"></div>
       <details class="hint" style="margin-top:11px"><summary>看本月明細</summary>
@@ -975,7 +978,7 @@ nav button.on .ic{transform:translateY(-1px)}
         <p class="note" style="margin:8px 0 0">依你記錄的持倉、現金與計畫自動判斷，為 MJ老師公開教學心法的整理與自我對照，非投資建議。</p>
       </div>
     </div>
-    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v118</p>
+    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v119</p>
   </section>
 
   <!-- 交割 -->
@@ -1682,7 +1685,18 @@ function render(){
   document.getElementById('moTotalLbl').textContent=moNet?'本月淨投入':'本月投入';
   document.getElementById('moTotal').textContent=(moShow<0?'−':'')+fmt(Math.abs(Math.round(moShow)));
   var moTgl=document.getElementById('moTglBtn');
-  if(moTgl&&!moTgl._b){ moTgl._b=1; moTgl.onclick=function(){ state.moNet=!state.moNet; save(); render(); }; }
+  if(moTgl){
+    moTgl.textContent='⇄ '+(moNet?'毛額':'淨額');
+    moTgl.className='mopill'+(moNet?' net':'');
+    if(!moTgl._b){ moTgl._b=1; moTgl.onclick=function(){ state.moNet=!state.moNet; save(); render(); }; }
+  }
+  var moHint=document.getElementById('moNetHint');
+  if(moHint){
+    if(moNet){
+      moHint.style.display='';
+      moHint.textContent=moSell>0?('淨投入＝買進 '+fmt(Math.round(moTotal))+' − 賣出所得 '+fmt(Math.round(moSell))):'本月沒有賣出，淨投入＝毛投入';
+    } else moHint.style.display='none';
+  }
   var moResAddRow=document.getElementById('moResAddRow');
   if(moSpotRes>0){ moResAddRow.style.display=''; document.getElementById('moResAdd').textContent=fmt(Math.round(moSpotRes)); } else { moResAddRow.style.display='none'; }
   var moSellRow=document.getElementById('moSellRow');
