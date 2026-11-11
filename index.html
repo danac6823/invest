@@ -978,7 +978,7 @@ nav button.on .ic{transform:translateY(-1px)}
         <p class="note" style="margin:8px 0 0">依你記錄的持倉、現金與計畫自動判斷，為 MJ老師公開教學心法的整理與自我對照，非投資建議。</p>
       </div>
     </div>
-    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v119</p>
+    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v120</p>
   </section>
 
   <!-- 交割 -->
@@ -1688,7 +1688,7 @@ function render(){
   if(moTgl){
     moTgl.textContent='⇄ '+(moNet?'毛額':'淨額');
     moTgl.className='mopill'+(moNet?' net':'');
-    if(!moTgl._b){ moTgl._b=1; moTgl.onclick=function(){ state.moNet=!state.moNet; save(); render(); }; }
+    if(!moTgl._b){ moTgl._b=1; moTgl.onclick=function(e){ e.stopPropagation(); e.preventDefault(); state.moNet=!state.moNet; save(); render(); }; } // 卡片外層是 .progtap(data-go="tx")，不擋冒泡會跳到記錄頁
   }
   var moHint=document.getElementById('moNetHint');
   if(moHint){
