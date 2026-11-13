@@ -978,7 +978,7 @@ nav button.on .ic{transform:translateY(-1px)}
         <p class="note" style="margin:8px 0 0">依你記錄的持倉、現金與計畫自動判斷，為 MJ老師公開教學心法的整理與自我對照，非投資建議。</p>
       </div>
     </div>
-    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v120</p>
+    <p class="note" id="verTag" style="text-align:center;margin:18px 0 4px;color:var(--muted)">豐盛之路 v121</p>
   </section>
 
   <!-- 交割 -->
@@ -1883,6 +1883,19 @@ function render(){
       }).join('');
       hl.querySelectorAll('.hghead').forEach(function(b){ b.onclick=function(){ var w=b.closest('.hgrp'), cat=w.dataset.cat; state.holdClosed[cat]=!state.holdClosed[cat]; w.classList.toggle('closed'); save(); }; });
     }
+  }
+  // 已實現損益（賣出落袋）：合計常駐、點開看各檔，含已全部出清的標的
+  var realList=hs.filter(function(h){ return Math.abs(h.realized||0)>=1; });
+  if(realList.length){
+    realList.sort(function(a,b){ return Math.abs(b.realized)-Math.abs(a.realized); });
+    var rTot=realList.reduce(function(s,h){ return s+h.realized; },0);
+    hl.insertAdjacentHTML('beforeend',
+      '<details class="hint" style="margin-top:11px"'+(state.realOpen?' open':'')+' id="realBox"><summary>💰 已實現損益（賣出落袋）<b class="num '+plClass(rTot)+'" style="float:right">'+(rTot>=0?'+':'−')+fmt(Math.abs(Math.round(rTot)))+'</b></summary>'+
+      '<div class="moflow" style="margin-top:8px">'+
+      realList.map(function(h){ var r=h.realized; return '<div class="mor"><span class="mok">'+h.name+' <small style="color:var(--muted)">'+h.code+(h.sh>0?'':' · 已出清')+'</small></span><span class="mov num '+plClass(r)+'">'+(r>=0?'+':'−')+fmt(Math.abs(Math.round(r)))+'</span></div>'; }).join('')+
+      '</div><p class="note" style="margin:8px 0 0">賣出價 − 含費成本，已扣賣出手續費與證交稅；股利另記在帳戶頁。</p></details>');
+    var rlBox=document.getElementById('realBox');
+    rlBox.addEventListener('toggle', function(){ state.realOpen=rlBox.open; save(); });
   }
   hl.querySelectorAll('.hhead[data-code]').forEach(function(hh){ hh.onclick=function(){ openLightbox(hh.dataset.code); }; });
 
@@ -2810,6 +2823,7 @@ function openLightbox(code){
       '<div class="s"><div class="k">'+(isFund(h.code)?'含費均淨值':'含費均價')+'</div><div class="v">'+fmt2(h.avg)+'</div></div>'+
       '<div class="s"><div class="k">投入成本(含費)</div><div class="v">'+fmt(h.net)+'</div></div>'+
       '<div class="s"><div class="k">損益（報酬率）</div><div class="v '+pcls+'">'+(h.pnl>=0?'+':'−')+fmt(Math.abs(h.pnl))+'（'+(h.ret>=0?'+':'−')+pct(Math.abs(h.ret))+'）</div></div>'+
+      (Math.abs(h.realized||0)>=1?'<div class="s"><div class="k">已實現（賣出）</div><div class="v '+plClass(h.realized)+'">'+(h.realized>=0?'+':'−')+fmt(Math.abs(Math.round(h.realized)))+'</div></div>':'')+
       '<div class="s"><div class="k">年化 (XIRR)</div><div class="v">'+ann+'</div></div>'+
       '<div class="s"><div class="k">現價</div><div class="v">'+fmt2(h.px)+'</div></div>'+
     '</div>'+
